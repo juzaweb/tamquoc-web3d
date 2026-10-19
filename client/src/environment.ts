@@ -101,7 +101,88 @@ function buildCities(scene: THREE.Scene, content: Content) {
     for (const city of content.world.cities) {
       road(scene, city.gate.x, city.gate.z, center.x, center.z, 7, roadMaterial);
     }
+    for (const npc of content.world.npcs) {
+      const city = content.world.cities.find((entry) => entry.faction === npc.faction);
+      buildNpc(scene, npc.x, npc.z, npc.name, npc.interactRadius, city?.x ?? 0, city?.z ?? 0);
+    }
     buildBattlefield(scene);
+  }
+
+function buildNpc(
+  scene: THREE.Scene,
+  x: number,
+  z: number,
+  name: string,
+  interactRadius: number,
+  facingX: number,
+  facingZ: number,
+) {
+    const group = new THREE.Group();
+    const wood = new THREE.MeshStandardMaterial({ color: 0x5a3f28, roughness: 0.9 });
+    const cloth = new THREE.MeshStandardMaterial({ color: 0x7a2f2f, roughness: 0.85 });
+    const skin = new THREE.MeshStandardMaterial({ color: 0xd9ae87, roughness: 0.85 });
+
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(interactRadius - 0.25, interactRadius, 48),
+      new THREE.MeshBasicMaterial({ color: 0xe8c77a, transparent: true, opacity: 0.22, side: THREE.DoubleSide }),
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.set(x, 0.18, z);
+    scene.add(ring);
+
+    const counter = new THREE.Mesh(new THREE.BoxGeometry(3, 1.05, 1), wood);
+    counter.position.set(0, 0.52, 0.9);
+    counter.castShadow = true;
+    counter.receiveShadow = true;
+    group.add(counter);
+
+    const top = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.16, 1.35), new THREE.MeshStandardMaterial({ color: 0x8a6a42, roughness: 0.8 }));
+    top.position.set(0, 1.12, 0.9);
+    group.add(top);
+
+    for (const side of [-1, 1]) {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 3, 8), wood);
+      post.position.set(side * 1.7, 1.5, 0.4);
+      post.castShadow = true;
+      group.add(post);
+    }
+    const canopy = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.16, 2.4), cloth);
+    canopy.position.set(0, 3.05, 0.4);
+    canopy.rotation.x = -0.08;
+    canopy.castShadow = true;
+    group.add(canopy);
+
+    const jarMaterial = new THREE.MeshStandardMaterial({ color: 0x3f7a6a, roughness: 0.6 });
+    for (const offset of [-0.9, 0, 0.9]) {
+      const jar = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.12, 0.34, 10), jarMaterial);
+      jar.position.set(offset, 1.37, 0.9);
+      jar.castShadow = true;
+      group.add(jar);
+    }
+
+    const robe = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.46, 1.15, 10), cloth);
+    robe.position.set(0, 0.62, 0);
+    robe.castShadow = true;
+    group.add(robe);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.24, 16, 12), skin);
+    head.position.set(0, 1.4, 0);
+    head.castShadow = true;
+    group.add(head);
+    const hat = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.32, 12), wood);
+    hat.position.set(0, 1.62, 0);
+    group.add(hat);
+    const beard = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.34, 8), new THREE.MeshStandardMaterial({ color: 0xe6e6e6, roughness: 1 }));
+    beard.position.set(0, 1.22, 0.19);
+    beard.rotation.x = Math.PI;
+    group.add(beard);
+
+    group.position.set(x, 0, z);
+    group.rotation.y = Math.atan2(facingX - x, facingZ - z);
+    scene.add(group);
+
+    const label = textSprite(name, "#ffd98a", 4.2);
+    label.position.set(x, 3.6, z);
+    scene.add(label);
   }
 
 function road(scene: THREE.Scene, x1: number, z1: number, x2: number, z2: number, width: number, material: THREE.Material) {
@@ -191,16 +272,26 @@ function buildCity(scene: THREE.Scene, content: Content, city: CityInfo) {
     }
 
     const hutSpots: [number, number][] = [
-      [-10, -10],
-      [9, -9],
-      [-9, 9],
+      [-0.62 * half, -0.62 * half],
+      [0.58 * half, -0.58 * half],
+      [-0.58 * half, 0.58 * half],
+      [0.62 * half, 0.62 * half],
     ];
     hutSpots.forEach(([x, z], index) => {
       hut(scene, city.x + x, city.z + z, [0x6b4f32, 0x74553a, 0x5d452d][index % 3]!);
     });
 
-    banner(scene, city.x - 5, city.z + 12, city.color);
-    banner(scene, city.x + 5, city.z + 12, city.color);
+    const plaza = new THREE.Mesh(
+      new THREE.CircleGeometry(half * 0.32, 48),
+      new THREE.MeshStandardMaterial({ color: 0x746855, roughness: 0.95 }),
+    );
+    plaza.rotation.x = -Math.PI / 2;
+    plaza.position.set(city.x, 0.16, city.z);
+    plaza.receiveShadow = true;
+    scene.add(plaza);
+
+    banner(scene, city.x - 6, city.z + half * 0.62, city.color);
+    banner(scene, city.x + 6, city.z + half * 0.62, city.color);
 
     const label = textSprite(city.name, "#f2d391", 11);
     label.position.set(city.x, 10.5, city.z);
@@ -368,7 +459,8 @@ function buildNature(scene: THREE.Scene, content: Content) {
       const z = Math.sin(angle) * radius;
       if (Math.hypot(x - 47, z - 22) < 14) continue;
       if (Math.hypot(x, z) < 31) continue;
-      if (content.world.cities.some((city) => Math.abs(x - city.x) < 25 && Math.abs(z - city.z) < 25)) continue;
+      const cityClear = content.world.wallHalf + 8;
+      if (content.world.cities.some((city) => Math.abs(x - city.x) < cityClear && Math.abs(z - city.z) < cityClear)) continue;
       treePositions.push([x, z, 0.8 + Math.random() * 0.9]);
     }
     for (const [x, z, scale] of treePositions) tree(scene, x, z, scale);
@@ -378,7 +470,8 @@ function buildNature(scene: THREE.Scene, content: Content) {
       const radius = 18 + Math.random() * 92;
       const x = Math.cos(angle) * radius;
       const z = Math.sin(angle) * radius;
-      if (content.world.cities.some((city) => Math.abs(x - city.x) < 22 && Math.abs(z - city.z) < 22)) continue;
+      const cityClear = content.world.wallHalf + 4;
+      if (content.world.cities.some((city) => Math.abs(x - city.x) < cityClear && Math.abs(z - city.z) < cityClear)) continue;
       const rock = new THREE.Mesh(
         new THREE.DodecahedronGeometry(0.5 + Math.random() * 1.4),
         new THREE.MeshStandardMaterial({ color: 0x5b5f63, roughness: 1, flatShading: true }),

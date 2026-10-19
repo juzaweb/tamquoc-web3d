@@ -11,6 +11,7 @@ import {
   ITEMS,
   MONSTERS,
   MONSTER_SPAWNS,
+  NPCS,
   QUESTS,
   SECTS,
   SPAWN_POINTS,
@@ -28,6 +29,7 @@ import {
   toRuntimePlayer,
 } from "./persistence.js";
 import { crossesCityWall } from "./movement.js";
+import { resolvePurchase } from "./shop.js";
 import { applyExperience, clampPosition, computeStats, rollDamage } from "./stats.js";
 import type {
   CombatEvent,
@@ -720,6 +722,32 @@ export class GameWorld {
     player.dirty = true;
     this.emitSelf(player);
     this.io.to(socketId).emit("notification", { kind: "success", message: `Đã dùng ${template.name}.` });
+  }
+
+  async buyItem(socketId: string, npcId: string, templateId: string, quantity: number) {
+    const player = this.players.get(socketId);
+    if (!player) return;
+    const npc = NPCS.find((entry) => entry.id === npcId);
+    if (!npc) return this.error(socketId, "Thương nhân không tồn tại.");
+    if (this.distance(player, npc) > npc.interactRadius) {
+      return this.error(socketId, "Bạn cần đến gần thương nhân để mua hàng.");
+    }
+    const purchase = resolvePurchase(npc, templateId, quantity, player.gold);
+    if (!purchase.ok) return this.error(socketId, purchase.message);
+    const { template, amount, total } = purchase;
+    player.gold -= total;
+    try {
+      await addItemToInventory(player, templateId, amount, Boolean(template.stackable));
+    } catch (error) {
+      player.gold += total;
+      throw error;
+    }
+    player.dirty = true;
+    this.emitSelf(player);
+    this.io.to(socketId).emit("notification", {
+      kind: "success",
+      message: `Đã mua ${template.name} x${amount} (-${total} vàng).`,
+    });
   }
 
   acceptQuest(socketId: string, questId: string) {

@@ -8,6 +8,7 @@ import type {
   Content,
   FactionId,
   Gender,
+  NpcInfo,
   SelfState,
   SectId,
   WorldState,
@@ -36,6 +37,9 @@ let lastFrameAt = performance.now();
 let deathTimer: ReturnType<typeof setInterval> | null = null;
 let enteringGame = false;
 let suppressDisconnectNotice = false;
+let activeNpc: NpcInfo | null = null;
+let nearbyNpc: NpcInfo | null = null;
+let promptNpcId: string | null = null;
 
 const keys = new Set<string>();
 let selectedSect: SectId = "SHAOLIN";
@@ -370,6 +374,8 @@ function leaveGame() {
   self = null;
   worldState = null;
   target = null;
+  activeNpc = null;
+  nearbyNpc = null;
   if (deathTimer) clearInterval(deathTimer);
   deathTimer = null;
   $("death-overlay").classList.add("hidden");
@@ -394,6 +400,7 @@ function bindGameEvents() {
     updateSelfUI();
     if ($("inventory-panel").classList.contains("hidden") === false) renderInventory();
     if ($("quests-panel").classList.contains("hidden") === false) renderQuests();
+    if ($("shop-panel").classList.contains("hidden") === false) renderShop();
     if (!state.dead) $("death-overlay").classList.add("hidden");
   });
 
@@ -709,14 +716,104 @@ function renderQuests() {
   }
 }
 
-function openPanel(panel: "inventory" | "quests") {
+function renderShop() {
+  if (!activeNpc || !content || !self) return;
+  $("shop-name").textContent = activeNpc.name;
+  $("shop-gold").textContent = `${self.gold.toLocaleString("vi-VN")} vàng`;
+  const list = $("shop-list");
+  list.replaceChildren();
+  for (const entry of activeNpc.stock) {
+    const template = content.items[entry.templateId];
+    if (!template) continue;
+    const row = document.createElement("div");
+    row.className = "shop-row";
+    const info = document.createElement("div");
+    info.className = "shop-info";
+    const name = document.createElement("strong");
+    name.textContent = template.name;
+    const description = document.createElement("span");
+    description.className = "muted small";
+    description.textContent = template.description;
+    info.append(name, description);
+    const price = document.createElement("span");
+    price.className = "shop-price";
+    price.textContent = `${entry.price} vàng`;
+    const actions = document.createElement("div");
+    actions.className = "shop-actions";
+    for (const amount of [1, 5]) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "btn small";
+      button.textContent = `Mua ${amount}`;
+      button.disabled = self.gold < entry.price * amount;
+      button.addEventListener("click", () => {
+        if (!activeNpc) return;
+        net.emit("shop:buy", { npcId: activeNpc.id, templateId: entry.templateId, quantity: amount });
+      });
+      actions.appendChild(button);
+    }
+    row.append(info, price, actions);
+    list.appendChild(row);
+  }
+}
+
+function openShop(npc: NpcInfo) {
+  activeNpc = npc;
+  openPanel("shop");
+}
+
+function openPanel(panel: "inventory" | "quests" | "shop") {
+  if (panel === "shop") {
+    if (!nearbyNpc) {
+      notify("Hãy đến gần thương nhân trong thành.", "info");
+      return;
+    }
+    activeNpc = nearbyNpc;
+  }
   $("side-panel").classList.remove("hidden");
   $("inventory-panel").classList.toggle("hidden", panel !== "inventory");
   $("quests-panel").classList.toggle("hidden", panel !== "quests");
+  $("shop-panel").classList.toggle("hidden", panel !== "shop");
   $("tab-inventory").classList.toggle("active", panel === "inventory");
   $("tab-quests").classList.toggle("active", panel === "quests");
+  $("tab-shop").classList.toggle("active", panel === "shop");
   if (panel === "inventory") renderInventory();
-  else renderQuests();
+  else if (panel === "quests") renderQuests();
+  else renderShop();
+}
+
+function updateNpcPrompt() {
+  const prompt = $("npc-prompt");
+  if (currentScreen !== "game" || !content || !game) {
+    nearbyNpc = null;
+    promptNpcId = null;
+    prompt.classList.add("hidden");
+    $("tab-shop").classList.add("hidden");
+    return;
+  }
+  const position = game.getLocalPosition();
+  let best: NpcInfo | null = null;
+  let bestDist = Infinity;
+  if (position) {
+    for (const npc of content.world.npcs) {
+      const dist = Math.hypot(position.x - npc.x, position.z - npc.z);
+      if (dist <= npc.interactRadius && dist < bestDist) {
+        best = npc;
+        bestDist = dist;
+      }
+    }
+  }
+  nearbyNpc = best;
+  if (promptNpcId !== (best?.id ?? null)) {
+    promptNpcId = best?.id ?? null;
+    prompt.classList.toggle("hidden", !best);
+    $("tab-shop").classList.toggle("hidden", !best);
+    if (best) prompt.textContent = `Mở cửa hàng · ${best.name} (F)`;
+  }
+  if (activeNpc && (!best || best.id !== activeNpc.id)) {
+    activeNpc = null;
+    if (!$("shop-panel").classList.contains("hidden")) $("side-panel").classList.add("hidden");
+  }
 }
 
 function performAttack() {
@@ -769,6 +866,10 @@ function setupGameHud() {
   $("panel-quests-btn").addEventListener("click", () => openPanel("quests"));
   $("tab-inventory").addEventListener("click", () => openPanel("inventory"));
   $("tab-quests").addEventListener("click", () => openPanel("quests"));
+  $("tab-shop").addEventListener("click", () => openPanel("shop"));
+  $("npc-prompt").addEventListener("click", () => {
+    if (nearbyNpc) openShop(nearbyNpc);
+  });
   $("close-panel").addEventListener("click", () => $("side-panel").classList.add("hidden"));
   $("leave-btn").addEventListener("click", leaveGame);
   $("action-attack").addEventListener("click", performAttack);
@@ -807,6 +908,11 @@ function setupGameHud() {
     if (event.code === "Digit1") performAttack();
     if (event.code === "Digit2") performSkill();
     if (event.code === "Digit3") usePotion();
+    if (event.code === "KeyF" && nearbyNpc) {
+      event.preventDefault();
+      openShop(nearbyNpc);
+      return;
+    }
     if (event.code === "KeyI") {
       const visible = !$("side-panel").classList.contains("hidden");
       if (visible && !$("inventory-panel").classList.contains("hidden")) $("side-panel").classList.add("hidden");
@@ -830,6 +936,7 @@ function movementLoop() {
   const dt = Math.min(0.1, (now - lastFrameAt) / 1000);
   lastFrameAt = now;
   updateCooldowns(now);
+  updateNpcPrompt();
   if (currentScreen !== "game" || !game || !self || self.dead) return;
 
   const basis = game.getMovementBasis();

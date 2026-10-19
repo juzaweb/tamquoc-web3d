@@ -14,6 +14,7 @@ import {
   ITEMS,
   MAX_LEVEL,
   MONSTERS,
+  NPCS,
   QUESTS,
   SECTS,
   SPAWN_POINTS,
@@ -154,6 +155,7 @@ export async function registerRoutes(app: FastifyInstance) {
       wallHalf: CITY_WALL_HALF,
       gateHalf: CITY_GATE_HALF,
       cities: Object.values(CITIES).map((city) => ({ ...city, gate: cityGatePosition(city) })),
+      npcs: NPCS,
       spawnPoints: SPAWN_POINTS,
     },
   }));

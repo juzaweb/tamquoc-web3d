@@ -11,6 +11,7 @@ Game MMORPG 3D nhiều người chơi chạy trên trình duyệt. Server Node.j
 - **Chỉ số**: sức mạnh, tốc độ, trí tuệ, sinh lực, nội lực, công, thủ; tăng theo cấp và trang bị.
 - **Thế giới 3D**: 3 thành phe Hán/Thục/Ngụy, mỗi thành có 4 cổng, chiến trường trung tâm, rừng, hồ, núi, đèn lồng và thế giới nhiều người chơi đồng bộ 10 Hz.
 - **Bản đồ theo cấp**: quái vật được chia theo vùng farm, từ cấp 1 quanh thành đến chiến trường cấp cao; cấp nhân vật tối đa 100.
+- **Thành & thương nhân**: mỗi thành có tường thành rộng, khu trung tâm và NPC thương nhân bán Hồi Huyết Đan / Hồi Khí Đan.
 - **Chiến đấu**: đòn thường, tuyệt kỹ riêng từng môn phái, chí mạng, hồi máu, độc, hồi sinh sau khi gục ngã.
 - **Quái vật**: Sói Hoang, Yêu Xà, Sơn Tặc với AI tuần tra, đuổi theo và tấn công; hồi sinh theo thời gian.
 - **World boss**: Hắc Long Vương xuất hiện định kỳ tại chiến trường trung tâm, thông báo toàn server, rơi trang bị hiếm.
@@ -112,6 +113,7 @@ PORT=3001
 | `1` | Đòn thường |
 | `2` | Tuyệt kỹ môn phái |
 | `3` | Dùng Hồi Huyết Đan |
+| `F` | Mở cửa hàng khi đứng gần thương nhân |
 | `I` | Mở hành trang |
 | `J` | Mở nhiệm vụ |
 | `Enter` | Mở ô chat |

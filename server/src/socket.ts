@@ -21,6 +21,11 @@ const itemSchema = z.object({ itemId: z.string().min(1) });
 const slotSchema = z.object({ slot: z.enum(["weapon", "armor", "accessory"]) });
 const questSchema = z.object({ questId: z.string().min(1) });
 const pvpSchema = z.object({ enabled: z.boolean() });
+const shopBuySchema = z.object({
+  npcId: z.string().min(1),
+  templateId: z.string().min(1),
+  quantity: z.number().int().min(1).max(99),
+});
 
 export function registerSocketHandlers(io: Server, world: GameWorld) {
   io.use((socket, next) => {
@@ -91,6 +96,15 @@ export function registerSocketHandlers(io: Server, world: GameWorld) {
       const parsed = itemSchema.safeParse(payload);
       if (!parsed.success) return;
       run(world.useItem(socket.id, parsed.data.itemId), "Không thể sử dụng vật phẩm.");
+    });
+
+    socket.on("shop:buy", (payload) => {
+      const parsed = shopBuySchema.safeParse(payload);
+      if (!parsed.success) return;
+      run(
+        world.buyItem(socket.id, parsed.data.npcId, parsed.data.templateId, parsed.data.quantity),
+        "Không thể mua vật phẩm.",
+      );
     });
 
     socket.on("quest:accept", (payload) => {

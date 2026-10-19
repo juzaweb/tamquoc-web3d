@@ -3,10 +3,12 @@ import test from "node:test";
 import {
   CITIES,
   CITY_SAFE_RADIUS,
+  CITY_WALL_HALF,
   ITEMS,
   MAX_LEVEL,
   MONSTERS,
   MONSTER_SPAWNS,
+  NPCS,
   QUESTS,
   SECTS,
   SPAWN_POINTS,
@@ -51,6 +53,28 @@ test("monster farms are outside city safe zones", () => {
     for (const city of Object.values(CITIES)) {
       const distance = Math.hypot(spawn.x - city.x, spawn.z - city.z);
       assert.ok(distance > CITY_SAFE_RADIUS, `${spawn.monsterId} spawns inside ${city.name}`);
+    }
+  }
+});
+
+test("each city has a shop npc inside the walls selling potions", () => {
+  for (const faction of ["HAN", "SHU", "WEI"] as const) {
+    const city = CITIES[faction];
+    const npc = NPCS.find((entry) => entry.faction === faction);
+    assert.ok(npc, `missing shop npc for ${faction}`);
+    assert.ok(Math.abs(npc.x - city.x) < CITY_WALL_HALF, `npc outside ${city.name}`);
+    assert.ok(Math.abs(npc.z - city.z) < CITY_WALL_HALF, `npc outside ${city.name}`);
+    const spawn = SPAWN_POINTS[faction];
+    assert.ok(
+      Math.hypot(spawn.x - npc.x, spawn.z - npc.z) > npc.interactRadius,
+      `player starts within shop range in ${city.name}`,
+    );
+    const stockIds = npc.stock.map((entry) => entry.templateId);
+    assert.ok(stockIds.includes("potion_hp"));
+    assert.ok(stockIds.includes("potion_mp"));
+    for (const entry of npc.stock) {
+      assert.ok(ITEMS[entry.templateId], `missing shop item ${entry.templateId}`);
+      assert.ok(entry.price > 0);
     }
   }
 });

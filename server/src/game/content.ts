@@ -3,11 +3,11 @@ export type FactionId = "HAN" | "SHU" | "WEI";
 
 export const MAX_LEVEL = 100;
 export const WORLD_RADIUS = 112;
-export const CITY_SAFE_RADIUS = 18.5;
+export const CITY_SAFE_RADIUS = 24.5;
 export const GATE_PK_RADIUS = 9;
-export const CITY_WALL_HALF = 18;
+export const CITY_WALL_HALF = 24;
 export const CITY_GATE_HALF = 4;
-export const GATE_PK_INNER_RADIUS = 16;
+export const GATE_PK_INNER_RADIUS = 24.5;
 export type Gender = "MALE" | "FEMALE";
 export type SkillType = "MELEE" | "RANGED" | "HEAL" | "POISON";
 
@@ -522,13 +522,68 @@ export interface CityDefinition {
   z: number;
   color: number;
   mainGate: "NORTH" | "SOUTH" | "EAST" | "WEST";
+  merchant: { x: number; z: number };
 }
 
 export const CITIES: Record<FactionId, CityDefinition> = {
-  HAN: { faction: "HAN", name: "Hán Thành", x: 0, z: -76, color: 0x5ea8ff, mainGate: "NORTH" },
-  SHU: { faction: "SHU", name: "Thục Thành", x: -76, z: 30, color: 0x5eff9c, mainGate: "EAST" },
-  WEI: { faction: "WEI", name: "Ngụy Thành", x: 76, z: 30, color: 0xff6b6b, mainGate: "WEST" },
+  HAN: {
+    faction: "HAN",
+    name: "Hán Thành",
+    x: 0,
+    z: -76,
+    color: 0x5ea8ff,
+    mainGate: "NORTH",
+    merchant: { x: 0, z: -8 },
+  },
+  SHU: {
+    faction: "SHU",
+    name: "Thục Thành",
+    x: -76,
+    z: 30,
+    color: 0x5eff9c,
+    mainGate: "EAST",
+    merchant: { x: -8, z: 0 },
+  },
+  WEI: {
+    faction: "WEI",
+    name: "Ngụy Thành",
+    x: 76,
+    z: 30,
+    color: 0xff6b6b,
+    mainGate: "WEST",
+    merchant: { x: 8, z: 0 },
+  },
 };
+
+export interface NpcStockEntry {
+  templateId: string;
+  price: number;
+}
+
+export interface NpcDefinition {
+  id: string;
+  name: string;
+  faction: FactionId;
+  x: number;
+  z: number;
+  interactRadius: number;
+  stock: NpcStockEntry[];
+}
+
+export const NPC_STOCK: NpcStockEntry[] = [
+  { templateId: "potion_hp", price: 30 },
+  { templateId: "potion_mp", price: 35 },
+];
+
+export const NPCS: NpcDefinition[] = Object.values(CITIES).map((city) => ({
+  id: `merchant_${city.faction.toLowerCase()}`,
+  name: "Tạp Hóa Lão Bản",
+  faction: city.faction,
+  x: city.x + city.merchant.x,
+  z: city.z + city.merchant.z,
+  interactRadius: 6,
+  stock: NPC_STOCK,
+}));
 
 export const SPAWN_POINTS: Record<FactionId, { x: number; z: number }> = {
   HAN: { x: 0, z: -66 },

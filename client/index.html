@@ -151,6 +151,7 @@
           <div class="panel-tabs">
             <button id="tab-inventory" class="tab active" data-panel="inventory">Hành trang</button>
             <button id="tab-quests" class="tab" data-panel="quests">Nhiệm vụ</button>
+            <button id="tab-shop" class="tab" data-panel="shop">Cửa hàng</button>
             <button id="close-panel" class="icon-btn">×</button>
           </div>
           <div id="inventory-panel" class="panel-content">
@@ -161,7 +162,17 @@
           <div id="quests-panel" class="panel-content hidden">
             <div id="quest-list" class="quest-list"></div>
           </div>
+          <div id="shop-panel" class="panel-content hidden">
+            <div class="shop-header">
+              <strong id="shop-name">Cửa hàng</strong>
+              <span id="shop-gold" class="muted small">0 vàng</span>
+            </div>
+            <div id="shop-list" class="shop-list"></div>
+            <p class="muted small">Đứng gần thương nhân để mua thuốc.</p>
+          </div>
         </aside>
+
+        <button id="npc-prompt" class="npc-prompt hidden">Mở cửa hàng (F)</button>
 
         <div class="hud-bottom-left">
           <div id="chat-log" class="chat-log"></div>
@@ -198,7 +209,7 @@
           <span>WASD di chuyển</span>
           <span>Chuột trái kéo xoay camera</span>
           <span>Click chọn mục tiêu</span>
-          <span>1 đánh · 2 tuyệt kỹ</span>
+          <span>1 đánh · 2 tuyệt kỹ · F cửa hàng</span>
         </div>
 
         <div id="notifications" class="notifications"></div>

@@ -67,6 +67,22 @@ export interface CityInfo {
   color: number;
   mainGate: "NORTH" | "SOUTH" | "EAST" | "WEST";
   gate: { x: number; z: number };
+  merchant: { x: number; z: number };
+}
+
+export interface NpcStockEntry {
+  templateId: string;
+  price: number;
+}
+
+export interface NpcInfo {
+  id: string;
+  name: string;
+  faction: FactionId;
+  x: number;
+  z: number;
+  interactRadius: number;
+  stock: NpcStockEntry[];
 }
 
 export interface WorldInfo {
@@ -78,6 +94,7 @@ export interface WorldInfo {
   wallHalf: number;
   gateHalf: number;
   cities: CityInfo[];
+  npcs: NpcInfo[];
   spawnPoints: Record<FactionId, { x: number; z: number }>;
 }
 
