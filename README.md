@@ -106,14 +106,15 @@ PORT=3001
 
 | Phím / thao tác | Chức năng |
 | --- | --- |
-| `W A S D` / phím mũi tên | Di chuyển theo hướng camera |
+| Click chuột trái mặt đất | Di chuyển đến điểm click |
+| Click quái / người chơi | Chọn mục tiêu |
 | Kéo chuột trái | Xoay camera |
 | Lăn chuột | Thu phóng |
-| Click quái / người chơi | Chọn mục tiêu |
 | `Tab` | Chọn mục tiêu kế tiếp |
-| `1` | Đòn thường |
-| `2` | Tuyệt kỹ môn phái |
-| `3` | Dùng Hồi Huyết Đan |
+| `Q` | Đòn thường |
+| `W`, `E`, `R` | Tuyệt kỹ / Dùng skill |
+| `A` | Dùng Hồi Huyết Đan |
+| `S` | Dùng Hồi Khí Đan |
 | `F` | Mở cửa hàng khi đứng gần thương nhân |
 | `I` | Mở hành trang |
 | `J` | Mở nhiệm vụ |

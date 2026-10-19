@@ -42,6 +42,7 @@ let activeCharacter: CharacterSummary | null = null;
 let activeNpc: NpcInfo | null = null;
 let nearbyNpc: NpcInfo | null = null;
 let promptNpcId: string | null = null;
+let clickTargetPosition: { x: number; z: number } | null = null;
 
 const keys = new Set<string>();
 let selectedSect: SectId = "SHAOLIN";
@@ -343,10 +344,18 @@ async function enterGame(character: CharacterSummary) {
   $("loading-overlay").classList.remove("hidden", "fade-out");
   resetCanvas();
   game?.dispose();
-  game = new GameClient($<HTMLCanvasElement>("game-canvas"), content, (id, kind) => {
-    target = id && kind ? { id, kind } : null;
-    updateTargetFrame();
-  });
+  clickTargetPosition = null;
+  game = new GameClient(
+    $<HTMLCanvasElement>("game-canvas"),
+    content,
+    (id, kind) => {
+      target = id && kind ? { id, kind } : null;
+      updateTargetFrame();
+    },
+    (point) => {
+      clickTargetPosition = { x: point.x, z: point.z };
+    },
+  );
   clearChat();
   appendSystemChat("Đang kết nối tới thế giới...");
   try {
@@ -402,6 +411,7 @@ function leaveGame() {
   suppressDisconnectNotice = true;
   enteringGame = false;
   activeCharacter = null;
+  clickTargetPosition = null;
   reconnect.stop();
   keys.clear();
   net.disconnect();
@@ -886,13 +896,26 @@ function performSkill() {
   net.emit("combat:skill", { targetId: target?.id ?? null, targetType: target?.kind ?? "monster" });
 }
 
-function usePotion() {
+function useHpPotion() {
   if (!self) return;
   const now = performance.now();
   if (now < potionReadyAt) return;
   const potion = self.items.find((item) => item.templateId === "potion_hp");
   if (!potion) {
     notify("Bạn không còn Hồi Huyết Đan.", "danger");
+    return;
+  }
+  potionReadyAt = now + 1200;
+  net.emit("inventory:use", { itemId: potion.id });
+}
+
+function useMpPotion() {
+  if (!self) return;
+  const now = performance.now();
+  if (now < potionReadyAt) return;
+  const potion = self.items.find((item) => item.templateId === "potion_mp");
+  if (!potion) {
+    notify("Bạn không còn Hồi Khí Đan.", "danger");
     return;
   }
   potionReadyAt = now + 1200;
@@ -915,7 +938,8 @@ function setupGameHud() {
   $("leave-btn").addEventListener("click", leaveGame);
   $("action-attack").addEventListener("click", performAttack);
   $("action-skill").addEventListener("click", performSkill);
-  $("action-potion").addEventListener("click", usePotion);
+  $("action-potion-hp").addEventListener("click", useHpPotion);
+  $("action-potion-mp").addEventListener("click", useMpPotion);
 
   $<HTMLFormElement>("chat-form").addEventListener("submit", (event) => {
     event.preventDefault();
@@ -946,9 +970,10 @@ function setupGameHud() {
       return;
     }
     keys.add(event.code);
-    if (event.code === "Digit1") performAttack();
-    if (event.code === "Digit2") performSkill();
-    if (event.code === "Digit3") usePotion();
+    if (event.code === "KeyQ" || event.code === "Digit1") performAttack();
+    if (event.code === "KeyW" || event.code === "KeyE" || event.code === "KeyR" || event.code === "Digit2") performSkill();
+    if (event.code === "KeyA" || event.code === "Digit3") useHpPotion();
+    if (event.code === "KeyS") useMpPotion();
     if (event.code === "KeyF" && nearbyNpc) {
       event.preventDefault();
       openShop(nearbyNpc);
@@ -978,39 +1003,35 @@ function movementLoop() {
   lastFrameAt = now;
   updateCooldowns(now);
   updateNpcPrompt();
-  if (currentScreen !== "game" || !game || !self || self.dead || !net.connected) return;
+  if (currentScreen !== "game" || !game || !self || self.dead || !net.connected) {
+    clickTargetPosition = null;
+    return;
+  }
 
-  const basis = game.getMovementBasis();
-  let dx = 0;
-  let dz = 0;
-  if (keys.has("KeyW") || keys.has("ArrowUp")) {
-    dx += basis.forward.x;
-    dz += basis.forward.z;
-  }
-  if (keys.has("KeyS") || keys.has("ArrowDown")) {
-    dx -= basis.forward.x;
-    dz -= basis.forward.z;
-  }
-  if (keys.has("KeyD") || keys.has("ArrowRight")) {
-    dx += basis.right.x;
-    dz += basis.right.z;
-  }
-  if (keys.has("KeyA") || keys.has("ArrowLeft")) {
-    dx -= basis.right.x;
-    dz -= basis.right.z;
-  }
-  if (dx === 0 && dz === 0) return;
+  if (!clickTargetPosition) return;
 
-  const length = Math.hypot(dx, dz);
-  dx /= length;
-  dz /= length;
   const position = game.getLocalPosition();
   if (!position) return;
-  const step = self.stats.moveSpeed * dt;
+
+  const dist = Math.hypot(clickTargetPosition.x - position.x, clickTargetPosition.z - position.z);
+  if (dist < 0.25) {
+    clickTargetPosition = null;
+    return;
+  }
+
+  const dx = (clickTargetPosition.x - position.x) / dist;
+  const dz = (clickTargetPosition.z - position.z) / dist;
+
+  const step = Math.min(dist, self.stats.moveSpeed * dt);
   const radius = content?.world.radius ?? 110;
   const nextX = Math.max(-radius, Math.min(radius, position.x + dx * step));
   const nextZ = Math.max(-radius, Math.min(radius, position.z + dz * step));
-  if (content && crossesCityWall(content.world, position.x, position.z, nextX, nextZ)) return;
+
+  if (content && crossesCityWall(content.world, position.x, position.z, nextX, nextZ)) {
+    clickTargetPosition = null;
+    return;
+  }
+
   game.setLocalTarget(nextX, nextZ);
   if (now - lastMoveSentAt > 90) {
     lastMoveSentAt = now;
