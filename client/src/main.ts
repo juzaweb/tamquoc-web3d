@@ -2,6 +2,7 @@ import "./style.css";
 import { GameClient } from "./game";
 import { crossesCityWall } from "./collision";
 import { Net } from "./net";
+import { ReconnectController } from "./reconnect";
 import type {
   CharacterSummary,
   CombatEvent,
@@ -37,6 +38,7 @@ let lastFrameAt = performance.now();
 let deathTimer: ReturnType<typeof setInterval> | null = null;
 let enteringGame = false;
 let suppressDisconnectNotice = false;
+let activeCharacter: CharacterSummary | null = null;
 let activeNpc: NpcInfo | null = null;
 let nearbyNpc: NpcInfo | null = null;
 let promptNpcId: string | null = null;
@@ -334,6 +336,9 @@ function resetCanvas() {
 async function enterGame(character: CharacterSummary) {
   if (!token || !content || enteringGame) return;
   enteringGame = true;
+  reconnect.stop();
+  suppressDisconnectNotice = false;
+  activeCharacter = character;
   showScreen("game");
   $("loading-overlay").classList.remove("hidden", "fade-out");
   resetCanvas();
@@ -349,6 +354,8 @@ async function enterGame(character: CharacterSummary) {
     net.emit("world:enter", { characterId: character.id });
   } catch (error) {
     net.disconnect();
+    activeCharacter = null;
+    reconnect.stop();
     showScreen("characters");
     notify(error instanceof Error ? error.message : "Không thể kết nối.", "danger");
   } finally {
@@ -364,9 +371,38 @@ function appendSystemChat(message: string) {
   appendChat({ channel: "system", from: "Hệ thống", faction: null, message, system: true });
 }
 
+const reconnect = new ReconnectController({
+  getToken: () => token,
+  getCharacterId: () => activeCharacter?.id ?? null,
+  connect: (value) => net.connect(value),
+  disconnect: () => net.disconnect(),
+  enterWorld: (characterId) => net.emit("world:enter", { characterId }),
+  onBanner: (message) => {
+    const banner = $("reconnect-banner");
+    banner.classList.toggle("hidden", !message);
+    if (message) banner.textContent = message;
+  },
+  onNotice: (message) => notify(message, "danger"),
+  onSystemChat: appendSystemChat,
+  onRestored: () => {
+    notify("Đã kết nối lại.", "success");
+    appendSystemChat("Đã kết nối lại với server.");
+  },
+  onGiveUp: (message, sessionExpired) => {
+    notify(message, "danger");
+    if (sessionExpired) {
+      token = null;
+      localStorage.removeItem("tq_token");
+    }
+    leaveGame();
+  },
+});
+
 function leaveGame() {
   suppressDisconnectNotice = true;
   enteringGame = false;
+  activeCharacter = null;
+  reconnect.stop();
   keys.clear();
   net.disconnect();
   game?.dispose();
@@ -386,6 +422,7 @@ function bindGameEvents() {
   net.on("world:init", (payload: { self: SelfState; world: WorldState }) => {
     self = payload.self;
     worldState = payload.world;
+    reconnect.notifyWorldInit();
     if (game) game.setSelf(self, payload.world, net.id ?? "");
     updateSelfUI();
     renderInventory();
@@ -459,15 +496,19 @@ function bindGameEvents() {
     notify(payload.message, "danger");
   });
 
-  net.on("disconnect", () => {
-    if (currentScreen === "game" && !suppressDisconnectNotice) {
-      const activeGame = game;
-      notify("Mất kết nối tới server.", "danger");
-      setTimeout(() => {
-        if (currentScreen === "game" && game === activeGame) leaveGame();
-      }, 1500);
+  net.on("disconnect", (reason: string) => {
+    if (currentScreen !== "game" || suppressDisconnectNotice) {
+      suppressDisconnectNotice = false;
+      return;
     }
-    suppressDisconnectNotice = false;
+    if (reason === "io server disconnect") {
+      reconnect.stop();
+      notify("Phiên chơi đã được tiếp nhận ở nơi khác.", "danger");
+      leaveGame();
+      return;
+    }
+    if (reason === "io client disconnect") return;
+    reconnect.start();
   });
 }
 
@@ -937,7 +978,7 @@ function movementLoop() {
   lastFrameAt = now;
   updateCooldowns(now);
   updateNpcPrompt();
-  if (currentScreen !== "game" || !game || !self || self.dead) return;
+  if (currentScreen !== "game" || !game || !self || self.dead || !net.connected) return;
 
   const basis = game.getMovementBasis();
   let dx = 0;

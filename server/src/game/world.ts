@@ -87,6 +87,7 @@ export class GameWorld {
   private readonly players = new Map<string, RuntimePlayer>();
   private readonly monsters = new Map<string, RuntimeMonster>();
   private readonly activeCharacters = new Set<string>();
+  private readonly pendingLeaves = new Map<string, Promise<void>>();
   private tickTimer: ReturnType<typeof setInterval> | null = null;
   private saveTimer: ReturnType<typeof setInterval> | null = null;
   private tick = 0;
@@ -353,6 +354,30 @@ export class GameWorld {
       return existing;
     }
     if (existing) await this.leave(socketId);
+    const pendingLeave = this.pendingLeaves.get(characterId);
+    if (pendingLeave) await pendingLeave;
+
+    const active = [...this.players.values()].find((player) => player.characterId === characterId);
+    if (active) {
+      if (active.userId !== userId) {
+        throw new Error("Nhân vật đang được điều khiển ở một phiên khác.");
+      }
+      const previousSocketId = active.socketId;
+      this.players.delete(previousSocketId);
+      active.socketId = socketId;
+      this.players.set(socketId, active);
+      this.io.to(socketId).emit("world:init", {
+        self: selfDto(active),
+        world: this.snapshot(Date.now()),
+      });
+      this.io.to(socketId).emit("notification", {
+        kind: "success",
+        message: "Đã kết nối lại. Nhân vật của bạn được giữ nguyên.",
+      });
+      this.io.sockets.sockets.get(previousSocketId)?.disconnect(true);
+      return active;
+    }
+
     if (this.activeCharacters.has(characterId)) {
       throw new Error("Nhân vật đang được điều khiển ở một phiên khác.");
     }
@@ -384,14 +409,19 @@ export class GameWorld {
   async leave(socketId: string) {
     const player = this.players.get(socketId);
     if (!player) return;
+    const { characterId, name } = player;
     this.players.delete(socketId);
-    this.activeCharacters.delete(player.characterId);
-    try {
-      await savePlayer(player);
-    } catch (error) {
+    this.activeCharacters.delete(characterId);
+    const saving = savePlayer(player).catch((error) => {
       console.error("Failed to save player on leave", error);
+    });
+    this.pendingLeaves.set(characterId, saving);
+    try {
+      await saving;
+    } finally {
+      if (this.pendingLeaves.get(characterId) === saving) this.pendingLeaves.delete(characterId);
     }
-    this.systemChat(`${player.name} đã rời khỏi thế giới.`);
+    this.systemChat(`${name} đã rời khỏi thế giới.`);
   }
 
   getPlayer(socketId: string): RuntimePlayer | undefined {

@@ -5,6 +5,7 @@ Game MMORPG 3D nhiều người chơi chạy trên trình duyệt. Server Node.j
 ## Tính năng
 
 - **Tài khoản**: đăng ký, đăng nhập bằng JWT, mật khẩu hash bcrypt, lưu phiên ở `localStorage`.
+- **Kết nối**: tự động kết nối lại khi mất mạng, giữ nguyên nhân vật và trạng thái thế giới.
 - **Nhân vật**: tối đa 4 nhân vật/tài khoản; chọn môn phái, phe phái, giới tính, màu y phục và màu tóc.
 - **Môn phái**: Thiếu Lâm (chưởng), Võ Đang (kiếm), Nga My (nữ, kiếm), Ngũ Độc (chảo).
 - **Phe phái**: Hán, Thục, Ngụy.

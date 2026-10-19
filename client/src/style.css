@@ -1058,6 +1058,21 @@ input[type="color"] {
   pointer-events: none;
 }
 
+.reconnect-banner {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9;
+  padding: 8px 18px;
+  border: 1px solid rgba(232, 199, 122, 0.55);
+  border-radius: 999px;
+  background: rgba(24, 18, 10, 0.92);
+  color: var(--gold-bright);
+  font-size: 13px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+}
+
 .notifications {
   position: absolute;
   top: 120px;
