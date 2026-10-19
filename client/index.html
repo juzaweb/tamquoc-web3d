@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tam Quốc Online - 3D MMORPG</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <section id="auth-screen" class="screen auth-screen">
+        <div class="auth-sky"></div>
+        <div class="auth-brand">
+          <div class="seal">三</div>
+          <h1>TAM QUỐC ONLINE</h1>
+          <p>Võ lâm loạn thế · Huynh đệ tương phùng</p>
+        </div>
+
+        <div class="auth-card">
+          <div class="tabs">
+            <button class="tab active" data-auth-tab="login">Đăng nhập</button>
+            <button class="tab" data-auth-tab="register">Tạo tài khoản</button>
+          </div>
+
+          <form id="login-form" class="auth-form">
+            <label>Tên tài khoản<input name="username" autocomplete="username" minlength="3" maxlength="24" required /></label>
+            <label>Mật khẩu<input name="password" type="password" autocomplete="current-password" minlength="6" required /></label>
+            <button class="btn btn-primary" type="submit">Vào giang hồ</button>
+          </form>
+
+          <form id="register-form" class="auth-form hidden">
+            <label>Tên tài khoản<input name="username" autocomplete="username" minlength="3" maxlength="24" required /></label>
+            <label>Mật khẩu<input name="password" type="password" autocomplete="new-password" minlength="6" required /></label>
+            <label>Nhập lại mật khẩu<input name="confirm" type="password" autocomplete="new-password" minlength="6" required /></label>
+            <button class="btn btn-primary" type="submit">Khởi tạo tài khoản</button>
+          </form>
+
+          <p id="auth-error" class="form-error"></p>
+          <p class="auth-hint">Tài khoản chỉ gồm chữ, số và dấu gạch dưới.</p>
+        </div>
+      </section>
+
+      <section id="character-screen" class="screen character-screen hidden">
+        <header class="character-header">
+          <div>
+            <h2>Chọn nhân vật</h2>
+            <p class="muted">Tài khoản: <span id="account-name"></span></p>
+          </div>
+          <div class="header-actions">
+            <span id="character-count" class="chip"></span>
+            <button id="logout-btn" class="btn btn-ghost">Đăng xuất</button>
+          </div>
+        </header>
+
+        <div class="character-layout">
+          <div class="character-list-wrap">
+            <div id="character-list" class="character-list"></div>
+            <div id="no-characters" class="empty-state hidden">
+              <p>Chưa có nhân vật nào.</p>
+              <p class="muted">Hãy tạo nhân vật đầu tiên để bước vào Tam Quốc.</p>
+            </div>
+          </div>
+
+          <form id="create-character-form" class="create-card">
+            <h3>Tạo nhân vật mới</h3>
+
+            <label class="field">Danh hiệu
+              <input name="name" minlength="3" maxlength="16" placeholder="Ví dụ: TrieuVan" required />
+            </label>
+
+            <div class="field">
+              <span>Môn phái</span>
+              <div id="sect-options" class="option-grid"></div>
+            </div>
+
+            <div class="field two-cols">
+              <div>
+                <span>Phe phái</span>
+                <div id="faction-options" class="option-row"></div>
+              </div>
+              <div>
+                <span>Giới tính</span>
+                <div id="gender-options" class="option-row">
+                  <button type="button" class="option active" data-gender="MALE">Nam</button>
+                  <button type="button" class="option" data-gender="FEMALE">Nữ</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="field">
+              <span>Ngoại hình</span>
+              <div class="appearance-row">
+                <label>Màu y phục <input id="appearance-color" name="appearanceColor" type="color" value="#c0392b" /></label>
+                <label>Màu tóc <input id="appearance-hair" name="appearanceHair" type="color" value="#1b1b1f" /></label>
+              </div>
+            </div>
+
+            <div id="sect-summary" class="sect-summary"></div>
+            <p id="create-error" class="form-error"></p>
+            <button class="btn btn-primary" type="submit">Tạo nhân vật</button>
+          </form>
+        </div>
+      </section>
+
+      <section id="game-screen" class="screen game-screen hidden">
+        <canvas id="game-canvas"></canvas>
+
+        <div class="hud-top-left">
+          <div class="portrait-badge" id="portrait-badge">俠</div>
+          <div class="self-panel">
+            <div class="self-name-row">
+              <strong id="self-name">—</strong>
+              <span id="self-level" class="chip">Cấp 1</span>
+              <span id="self-faction" class="chip faction-chip">Hán</span>
+            </div>
+            <div class="bar hp-bar" title="Sinh lực">
+              <div id="hp-fill" class="bar-fill"></div>
+              <span id="hp-text">100 / 100</span>
+            </div>
+            <div class="bar mp-bar" title="Nội lực">
+              <div id="mp-fill" class="bar-fill"></div>
+              <span id="mp-text">50 / 50</span>
+            </div>
+            <div class="bar xp-bar" title="Kinh nghiệm">
+              <div id="xp-fill" class="bar-fill"></div>
+              <span id="xp-text">0 / 120 XP</span>
+            </div>
+            <div class="self-meta">
+              <span id="self-gold">0 vàng</span>
+              <span id="self-stats">Lực 0 · Tốc 0 · Trí 0</span>
+            </div>
+            <div class="zone-line"><span id="zone-name" class="chip">Chiến Trường Trung Nguyên</span></div>
+          </div>
+        </div>
+
+        <div class="hud-top-right">
+          <span id="online-count" class="chip">0 online</span>
+          <span id="boss-timer" class="chip boss-chip hidden">Boss</span>
+          <button id="pvp-toggle" class="btn btn-ghost small">PvP: Tắt</button>
+          <button id="panel-inventory-btn" class="btn btn-ghost small">Hành trang (I)</button>
+          <button id="panel-quests-btn" class="btn btn-ghost small">Nhiệm vụ (J)</button>
+          <button id="leave-btn" class="btn btn-ghost small">Về nhân vật</button>
+        </div>
+
+        <div id="target-frame" class="target-frame hidden">
+          <div class="target-name"><span id="target-name">—</span> <span id="target-level" class="muted"></span></div>
+          <div class="bar target-hp"><div id="target-hp-fill" class="bar-fill"></div><span id="target-hp-text"></span></div>
+        </div>
+
+        <aside id="side-panel" class="side-panel hidden">
+          <div class="panel-tabs">
+            <button id="tab-inventory" class="tab active" data-panel="inventory">Hành trang</button>
+            <button id="tab-quests" class="tab" data-panel="quests">Nhiệm vụ</button>
+            <button id="close-panel" class="icon-btn">×</button>
+          </div>
+          <div id="inventory-panel" class="panel-content">
+            <div class="equipment-row" id="equipment-row"></div>
+            <div id="inventory-grid" class="inventory-grid"></div>
+            <p class="muted small">Nhấn vật phẩm để trang bị / sử dụng.</p>
+          </div>
+          <div id="quests-panel" class="panel-content hidden">
+            <div id="quest-list" class="quest-list"></div>
+          </div>
+        </aside>
+
+        <div class="hud-bottom-left">
+          <div id="chat-log" class="chat-log"></div>
+          <form id="chat-form" class="chat-form">
+            <select id="chat-channel">
+              <option value="global">Thế giới</option>
+              <option value="faction">Phe</option>
+            </select>
+            <input id="chat-input" maxlength="240" placeholder="Nhấn Enter để nói..." autocomplete="off" />
+          </form>
+        </div>
+
+        <div class="action-bar">
+          <button class="action-slot" id="action-attack" title="Đòn thường (1)">
+            <span class="action-key">1</span>
+            <span class="action-icon">拳</span>
+            <span class="action-label">Công</span>
+            <span class="cooldown" id="cd-attack"></span>
+          </button>
+          <button class="action-slot" id="action-skill" title="Tuyệt kỹ (2)">
+            <span class="action-key">2</span>
+            <span class="action-icon" id="skill-icon">技</span>
+            <span class="action-label" id="skill-label">Tuyệt kỹ</span>
+            <span class="cooldown" id="cd-skill"></span>
+          </button>
+          <button class="action-slot" id="action-potion" title="Hồi huyết đan (3)">
+            <span class="action-key">3</span>
+            <span class="action-icon red">丹</span>
+            <span class="action-label">Hồi máu</span>
+          </button>
+        </div>
+
+        <div class="controls-hint">
+          <span>WASD di chuyển</span>
+          <span>Chuột trái kéo xoay camera</span>
+          <span>Click chọn mục tiêu</span>
+          <span>1 đánh · 2 tuyệt kỹ</span>
+        </div>
+
+        <div id="notifications" class="notifications"></div>
+
+        <div id="death-overlay" class="death-overlay hidden">
+          <div class="death-card">
+            <h2>Thân bại danh liệt</h2>
+            <p>Bạn đã gục ngã. Hồi sinh sau <strong id="respawn-countdown">5</strong> giây...</p>
+          </div>
+        </div>
+
+        <div id="loading-overlay" class="loading-overlay">
+          <div class="loading-seal">三</div>
+          <p>Đang bước vào giang hồ...</p>
+        </div>
+      </section>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

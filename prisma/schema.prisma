@@ -1,0 +1,55 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String      @id @default(cuid())
+  username     String      @unique
+  passwordHash String
+  createdAt    DateTime    @default(now())
+  characters   Character[]
+}
+
+model Character {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String    @unique
+  sect        String
+  faction     String
+  gender      String    @default("MALE")
+  appearance  String    @default("{}")
+  level       Int       @default(1)
+  xp          Int       @default(0)
+  gold        Int       @default(500)
+  hp          Int       @default(100)
+  mp          Int       @default(50)
+  x           Float     @default(0)
+  y           Float     @default(0)
+  z           Float     @default(6)
+  rotation    Float     @default(0)
+  pvpEnabled  Boolean   @default(false)
+  questsJson  String    @default("[]")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  items       Item[]
+
+  @@index([userId])
+}
+
+model Item {
+  id          String    @id @default(cuid())
+  characterId String
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  templateId  String
+  quantity    Int       @default(1)
+  slot        String?
+  createdAt   DateTime  @default(now())
+
+  @@index([characterId])
+}

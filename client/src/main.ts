@@ -1,0 +1,905 @@
+import "./style.css";
+import { GameClient } from "./game";
+import { crossesCityWall } from "./collision";
+import { Net } from "./net";
+import type {
+  CharacterSummary,
+  CombatEvent,
+  Content,
+  FactionId,
+  Gender,
+  SelfState,
+  SectId,
+  WorldState,
+} from "./types";
+
+const $ = <T extends HTMLElement = HTMLElement>(id: string): T => {
+  const element = document.getElementById(id);
+  if (!element) throw new Error(`Missing element #${id}`);
+  return element as T;
+};
+
+const net = new Net();
+let token = localStorage.getItem("tq_token");
+let content: Content | null = null;
+let characters: CharacterSummary[] = [];
+let self: SelfState | null = null;
+let worldState: WorldState | null = null;
+let game: GameClient | null = null;
+let target: { id: string; kind: "monster" | "player" } | null = null;
+let currentScreen: "auth" | "characters" | "game" = "auth";
+let attackReadyAt = 0;
+let skillReadyAt = 0;
+let potionReadyAt = 0;
+let lastMoveSentAt = 0;
+let lastFrameAt = performance.now();
+let deathTimer: ReturnType<typeof setInterval> | null = null;
+let enteringGame = false;
+let suppressDisconnectNotice = false;
+
+const keys = new Set<string>();
+let selectedSect: SectId = "SHAOLIN";
+let selectedFaction: FactionId = "HAN";
+let selectedGender: Gender = "MALE";
+
+async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const response = await fetch(path, { ...options, headers: { ...headers, ...(options.headers ?? {}) } });
+  const data = (await response.json().catch(() => ({}))) as { error?: string } & T;
+  if (!response.ok) throw new Error(data.error ?? "Yêu cầu thất bại.");
+  return data;
+}
+
+function showScreen(screen: "auth" | "characters" | "game") {
+  currentScreen = screen;
+  $("auth-screen").classList.toggle("hidden", screen !== "auth");
+  $("character-screen").classList.toggle("hidden", screen !== "characters");
+  $("game-screen").classList.toggle("hidden", screen !== "game");
+}
+
+function showAuthError(message: string) {
+  $("auth-error").textContent = message;
+}
+
+function notify(message: string, kind: "success" | "danger" | "info" = "info") {
+  const container = $("notifications");
+  const node = document.createElement("div");
+  node.className = `notification ${kind}`;
+  node.textContent = message;
+  container.appendChild(node);
+  setTimeout(() => node.remove(), 3800);
+}
+
+function appendChat(message: {
+  channel: string;
+  from: string;
+  faction: FactionId | null;
+  message: string;
+  system?: boolean;
+}) {
+  if (message.channel === "faction" && self && message.faction && message.faction !== self.faction) return;
+  const log = $("chat-log");
+  const line = document.createElement("div");
+  line.className = `chat-line ${message.channel}${message.system ? " system" : ""}`;
+  if (!message.system) {
+    const tag = document.createElement("span");
+    tag.className = "chat-channel-tag";
+    tag.textContent = message.channel === "faction" ? "[Phe]" : "[TG]";
+    line.appendChild(tag);
+    const from = document.createElement("span");
+    from.className = "chat-from";
+    from.textContent = `${message.from}: `;
+    line.appendChild(from);
+  }
+  const text = document.createElement("span");
+  text.textContent = message.message;
+  line.appendChild(text);
+  log.appendChild(line);
+  while (log.children.length > 120) log.firstElementChild?.remove();
+  log.scrollTop = log.scrollHeight;
+}
+
+function setupAuthTabs() {
+  document.querySelectorAll<HTMLButtonElement>("[data-auth-tab]").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll<HTMLButtonElement>("[data-auth-tab]").forEach((other) => {
+        other.classList.toggle("active", other === tab);
+      });
+      const isLogin = tab.dataset.authTab === "login";
+      $("login-form").classList.toggle("hidden", !isLogin);
+      $("register-form").classList.toggle("hidden", isLogin);
+      showAuthError("");
+    });
+  });
+}
+
+function setupAuthForms() {
+  $<HTMLFormElement>("login-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget as HTMLFormElement;
+    const data = new FormData(form);
+    showAuthError("");
+    try {
+      const result = await api<{ token: string }>("/api/auth/login", {
+        method: "POST",
+        body: JSON.stringify({
+          username: String(data.get("username") ?? ""),
+          password: String(data.get("password") ?? ""),
+        }),
+      });
+      token = result.token;
+      localStorage.setItem("tq_token", token);
+      await openCharacterScreen();
+    } catch (error) {
+      showAuthError(error instanceof Error ? error.message : "Đăng nhập thất bại.");
+    }
+  });
+
+  $<HTMLFormElement>("register-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget as HTMLFormElement;
+    const data = new FormData(form);
+    showAuthError("");
+    if (data.get("password") !== data.get("confirm")) {
+      showAuthError("Mật khẩu nhập lại không khớp.");
+      return;
+    }
+    try {
+      const result = await api<{ token: string }>("/api/auth/register", {
+        method: "POST",
+        body: JSON.stringify({
+          username: String(data.get("username") ?? ""),
+          password: String(data.get("password") ?? ""),
+        }),
+      });
+      token = result.token;
+      localStorage.setItem("tq_token", token);
+      await openCharacterScreen();
+    } catch (error) {
+      showAuthError(error instanceof Error ? error.message : "Tạo tài khoản thất bại.");
+    }
+  });
+
+  $("logout-btn").addEventListener("click", () => {
+    leaveGame();
+    token = null;
+    localStorage.removeItem("tq_token");
+    self = null;
+    showScreen("auth");
+  });
+}
+
+async function openCharacterScreen() {
+  if (!token) {
+    showScreen("auth");
+    return;
+  }
+  try {
+    const me = await api<{ user: { username: string } }>("/api/auth/me");
+    $("account-name").textContent = me.user.username;
+    await refreshCharacters();
+    showScreen("characters");
+  } catch {
+    token = null;
+    localStorage.removeItem("tq_token");
+    showScreen("auth");
+  }
+}
+
+async function refreshCharacters() {
+  const result = await api<{ characters: CharacterSummary[] }>("/api/characters");
+  characters = result.characters;
+  renderCharacterList();
+}
+
+function renderCharacterList() {
+  const list = $("character-list");
+  list.replaceChildren();
+  $("no-characters").classList.toggle("hidden", characters.length > 0);
+  $("character-count").textContent = `${characters.length}/4 nhân vật`;
+  if (!content) return;
+
+  for (const character of characters) {
+    const sect = content.sects[character.sect];
+    const faction = content.factions[character.faction];
+    const card = document.createElement("div");
+    card.className = "character-card";
+    card.style.setProperty("--accent", character.appearance?.color ?? "#d9b36c");
+
+    const name = document.createElement("h3");
+    name.textContent = character.name;
+    const meta = document.createElement("div");
+    meta.className = "char-meta";
+    meta.textContent = `${sect.name} · ${faction.name} · Cấp ${character.level}`;
+
+    const stats = document.createElement("div");
+    stats.className = "char-stats";
+    stats.innerHTML = `<span>Lực ${character.stats.strength}</span><span>Tốc ${character.stats.speed}</span><span>Trí ${character.stats.intelligence}</span>`;
+
+    const button = document.createElement("button");
+    button.className = "btn btn-primary";
+    button.textContent = "Vào thế giới";
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      void enterGame(character);
+    });
+    card.addEventListener("click", () => void enterGame(character));
+
+    card.append(name, meta, stats, button);
+    list.appendChild(card);
+  }
+}
+
+function renderCreateOptions() {
+  if (!content) return;
+  const sects = content.sects;
+  const sectWrap = $("sect-options");
+  sectWrap.replaceChildren();
+  for (const sect of Object.values(sects)) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `option${sect.id === selectedSect ? " active" : ""}`;
+    button.dataset.sect = sect.id;
+    button.innerHTML = `<strong>${sect.name}</strong><small>${sect.weaponName} · ${sect.skill.name}</small>`;
+    button.addEventListener("click", () => {
+      selectedSect = sect.id;
+      if (!sect.allowedGenders.includes(selectedGender)) selectedGender = sect.allowedGenders[0] ?? "MALE";
+      renderCreateOptions();
+    });
+    sectWrap.appendChild(button);
+  }
+
+  const factionWrap = $("faction-options");
+  factionWrap.replaceChildren();
+  for (const faction of Object.values(content.factions)) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `option${faction.id === selectedFaction ? " active" : ""}`;
+    button.textContent = faction.name;
+    button.addEventListener("click", () => {
+      selectedFaction = faction.id;
+      renderCreateOptions();
+    });
+    factionWrap.appendChild(button);
+  }
+
+  document.querySelectorAll<HTMLButtonElement>("[data-gender]").forEach((button) => {
+    const gender = button.dataset.gender as Gender;
+    const allowed = sects[selectedSect].allowedGenders.includes(gender);
+    button.classList.toggle("active", gender === selectedGender);
+    button.disabled = !allowed;
+    button.style.opacity = allowed ? "1" : "0.35";
+    button.onclick = () => {
+      if (!allowed) return;
+      selectedGender = gender;
+      renderCreateOptions();
+    };
+  });
+
+  const sect = sects[selectedSect];
+  const summary = $("sect-summary");
+  summary.innerHTML = `
+    <strong>${sect.name} · ${sect.weaponName}</strong><br/>
+    ${sect.description}<br/>
+    Sức mạnh ${sect.base.strength} · Tốc độ ${sect.base.speed} · Trí tuệ ${sect.base.intelligence}<br/>
+    Tuyệt kỹ: <strong>${sect.skill.name}</strong> — ${sect.skill.description}
+  `;
+}
+
+function setupCharacterCreation() {
+  renderCreateOptions();
+  $<HTMLFormElement>("create-character-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget as HTMLFormElement;
+    const data = new FormData(form);
+    const errorNode = $("create-error");
+    errorNode.textContent = "";
+    try {
+      await api("/api/characters", {
+        method: "POST",
+        body: JSON.stringify({
+          name: String(data.get("name") ?? "").trim(),
+          sect: selectedSect,
+          faction: selectedFaction,
+          gender: selectedGender,
+          appearance: {
+            color: String(data.get("appearanceColor") ?? "#c0392b"),
+            hair: String(data.get("appearanceHair") ?? "#1b1b1f"),
+          },
+        }),
+      });
+      form.reset();
+      $<HTMLInputElement>("appearance-color").value = "#c0392b";
+      $<HTMLInputElement>("appearance-hair").value = "#1b1b1f";
+      await refreshCharacters();
+      notify("Đã tạo nhân vật mới.", "success");
+    } catch (error) {
+      errorNode.textContent = error instanceof Error ? error.message : "Không thể tạo nhân vật.";
+    }
+  });
+}
+
+function resetCanvas() {
+  const old = $<HTMLCanvasElement>("game-canvas");
+  const fresh = old.cloneNode(false) as HTMLCanvasElement;
+  old.replaceWith(fresh);
+  return fresh;
+}
+
+async function enterGame(character: CharacterSummary) {
+  if (!token || !content || enteringGame) return;
+  enteringGame = true;
+  showScreen("game");
+  $("loading-overlay").classList.remove("hidden", "fade-out");
+  resetCanvas();
+  game?.dispose();
+  game = new GameClient($<HTMLCanvasElement>("game-canvas"), content, (id, kind) => {
+    target = id && kind ? { id, kind } : null;
+    updateTargetFrame();
+  });
+  clearChat();
+  appendSystemChat("Đang kết nối tới thế giới...");
+  try {
+    await net.connect(token);
+    net.emit("world:enter", { characterId: character.id });
+  } catch (error) {
+    net.disconnect();
+    showScreen("characters");
+    notify(error instanceof Error ? error.message : "Không thể kết nối.", "danger");
+  } finally {
+    enteringGame = false;
+  }
+}
+
+function clearChat() {
+  $("chat-log").replaceChildren();
+}
+
+function appendSystemChat(message: string) {
+  appendChat({ channel: "system", from: "Hệ thống", faction: null, message, system: true });
+}
+
+function leaveGame() {
+  suppressDisconnectNotice = true;
+  enteringGame = false;
+  keys.clear();
+  net.disconnect();
+  game?.dispose();
+  game = null;
+  self = null;
+  worldState = null;
+  target = null;
+  if (deathTimer) clearInterval(deathTimer);
+  deathTimer = null;
+  $("death-overlay").classList.add("hidden");
+  if (currentScreen === "game") void openCharacterScreen();
+}
+
+function bindGameEvents() {
+  net.on("world:init", (payload: { self: SelfState; world: WorldState }) => {
+    self = payload.self;
+    worldState = payload.world;
+    if (game) game.setSelf(self, payload.world, net.id ?? "");
+    updateSelfUI();
+    renderInventory();
+    renderQuests();
+    updateTargetFrame();
+    setTimeout(() => $("loading-overlay").classList.add("fade-out"), 250);
+    setTimeout(() => $("loading-overlay").classList.add("hidden"), 900);
+  });
+
+  net.on("self:update", (state: SelfState) => {
+    self = state;
+    updateSelfUI();
+    if ($("inventory-panel").classList.contains("hidden") === false) renderInventory();
+    if ($("quests-panel").classList.contains("hidden") === false) renderQuests();
+    if (!state.dead) $("death-overlay").classList.add("hidden");
+  });
+
+  net.on("world:state", (state: WorldState) => {
+    worldState = state;
+    game?.applyState(state);
+    const me = state.players.find((player) => player.id === net.id);
+    if (self && me) {
+      self.hp = me.hp;
+      self.mp = me.mp;
+      self.dead = me.dead;
+      self.x = me.x;
+      self.z = me.z;
+      updateSelfUI();
+    }
+    updateWorldMeta();
+    updateTargetFrame();
+  });
+
+  net.on("combat:event", (event: CombatEvent) => {
+    game?.playCombat(event);
+    if (event.killed && event.targetType === "monster" && event.attackerId === net.id) {
+      target = null;
+      updateTargetFrame();
+    }
+  });
+
+  net.on("chat:message", (message: { channel: string; from: string; faction: FactionId | null; message: string; system?: boolean }) => {
+    appendChat(message);
+  });
+
+  net.on("notification", (payload: { kind?: "success" | "danger" | "info"; message: string }) => {
+    notify(payload.message, payload.kind ?? "info");
+  });
+
+  net.on("loot", (payload: { xp: number; gold: number; items: { name: string; quantity: number }[] }) => {
+    const parts = [`+${payload.xp} XP`, `+${payload.gold} vàng`];
+    for (const item of payload.items) parts.push(`${item.name} x${item.quantity}`);
+    notify(`Nhận được: ${parts.join(", ")}`, "success");
+  });
+
+  net.on("level:up", (payload: { level: number }) => {
+    notify(`Thăng cấp! Bạn đạt cấp ${payload.level}.`, "success");
+  });
+
+  net.on("boss:spawn", (payload: { id: string; message: string }) => {
+    notify(payload.message, "danger");
+    game?.playBossSpawn(payload.id);
+  });
+
+  net.on("player:died", () => {
+    startDeathCountdown(5);
+  });
+
+  net.on("error:game", (payload: { message: string }) => {
+    notify(payload.message, "danger");
+  });
+
+  net.on("disconnect", () => {
+    if (currentScreen === "game" && !suppressDisconnectNotice) {
+      const activeGame = game;
+      notify("Mất kết nối tới server.", "danger");
+      setTimeout(() => {
+        if (currentScreen === "game" && game === activeGame) leaveGame();
+      }, 1500);
+    }
+    suppressDisconnectNotice = false;
+  });
+}
+
+function startDeathCountdown(seconds: number) {
+  $("death-overlay").classList.remove("hidden");
+  let remaining = seconds;
+  $("respawn-countdown").textContent = String(remaining);
+  if (deathTimer) clearInterval(deathTimer);
+  deathTimer = setInterval(() => {
+    remaining -= 1;
+    $("respawn-countdown").textContent = String(Math.max(0, remaining));
+    if (remaining <= 0) {
+      if (deathTimer) clearInterval(deathTimer);
+      deathTimer = null;
+    }
+  }, 1000);
+}
+
+function updateSelfUI() {
+  if (!self || !content) return;
+  const sect = content.sects[self.sect];
+  const faction = content.factions[self.faction];
+  $("self-name").textContent = self.name;
+  $("self-level").textContent = `Cấp ${self.level}`;
+  const factionChip = $("self-faction");
+  factionChip.textContent = faction.name;
+  factionChip.dataset.faction = self.faction;
+  $("portrait-badge").textContent = sect.name.charAt(0);
+
+  const hpRatio = Math.max(0, Math.min(1, self.hp / Math.max(1, self.stats.maxHp)));
+  const mpRatio = Math.max(0, Math.min(1, self.mp / Math.max(1, self.stats.maxMp)));
+  const atMaxLevel = self.level >= (content.world.maxLevel ?? 100);
+  const xpRatio = atMaxLevel ? 1 : Math.max(0, Math.min(1, self.xp / Math.max(1, self.xpNext)));
+  $("hp-fill").style.width = `${hpRatio * 100}%`;
+  $("mp-fill").style.width = `${mpRatio * 100}%`;
+  $("xp-fill").style.width = `${xpRatio * 100}%`;
+  $("hp-text").textContent = `${Math.round(self.hp)} / ${self.stats.maxHp}`;
+  $("mp-text").textContent = `${Math.round(self.mp)} / ${self.stats.maxMp}`;
+  $("xp-text").textContent = atMaxLevel ? "Cấp tối đa" : `${self.xp} / ${self.xpNext} XP`;
+  $("self-gold").textContent = `${self.gold.toLocaleString("vi-VN")} vàng`;
+  $("self-stats").textContent = `Lực ${self.stats.strength} · Tốc ${self.stats.speed} · Trí ${self.stats.intelligence}`;
+  updateZoneLabel();
+  $("skill-label").textContent = sect.skill.name;
+  $("skill-icon").textContent = sect.skill.type === "MELEE" ? "拳" : sect.skill.type === "RANGED" ? "劍" : sect.skill.type === "HEAL" ? "佛" : "毒";
+  $("pvp-toggle").textContent = `PvP: ${self.pvpEnabled ? "Bật" : "Tắt"}`;
+  $("pvp-toggle").classList.toggle("btn-primary", self.pvpEnabled);
+}
+
+function updateZoneLabel() {
+  if (!self || !content) return;
+  const world = content.world;
+  const zone = $("zone-name");
+  const atGate = world.cities.find((city) => {
+    const gate = city.gate;
+    return Math.hypot(self!.x - gate.x, self!.z - gate.z) < world.gatePkRadius
+      && Math.hypot(self!.x - city.x, self!.z - city.z) > world.gatePkInnerRadius;
+  });
+  if (atGate) {
+    zone.textContent = `${atGate.name} · Cổng chính · PK tự động`;
+    zone.dataset.faction = atGate.faction;
+    return;
+  }
+  const inCity = world.cities.find(
+    (city) => Math.hypot(self!.x - city.x, self!.z - city.z) < world.safeRadius,
+  );
+  if (inCity) {
+    zone.textContent = `${inCity.name} · Khu an toàn`;
+    zone.dataset.faction = inCity.faction;
+    return;
+  }
+  if (Math.hypot(self.x, self.z) < 30) {
+    zone.textContent = "Chiến Trường Trung Nguyên · PvP";
+    zone.dataset.faction = "";
+    return;
+  }
+  let nearest = world.cities[0]!;
+  for (const city of world.cities) {
+    if (Math.hypot(self.x - city.x, self.z - city.z) < Math.hypot(self.x - nearest.x, self.z - nearest.z)) {
+      nearest = city;
+    }
+  }
+  zone.textContent = `Ngoại thành ${nearest.name} · Bãi farm`;
+  zone.dataset.faction = nearest.faction;
+}
+
+function updateWorldMeta() {
+  if (!worldState) return;
+  $("online-count").textContent = `${worldState.players.length} online`;
+  const bossChip = $("boss-timer");
+  if (worldState.bossActive) {
+    bossChip.classList.remove("hidden");
+    bossChip.textContent = "Hắc Long Vương đang hoành hành";
+  } else {
+    const remaining = Math.max(0, Math.ceil((worldState.nextBossAt - Date.now()) / 1000));
+    bossChip.classList.remove("hidden");
+    bossChip.textContent = `Boss: ${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, "0")}`;
+  }
+}
+
+function updateTargetFrame() {
+  const frame = $("target-frame");
+  if (!target || !worldState) {
+    frame.classList.add("hidden");
+    return;
+  }
+  const entity = target.kind === "monster"
+    ? worldState.monsters.find((monster) => monster.id === target?.id)
+    : worldState.players.find((player) => player.id === target?.id);
+  if (!entity || entity.dead) {
+    target = null;
+    frame.classList.add("hidden");
+    game?.setTarget(null, null);
+    return;
+  }
+  frame.classList.remove("hidden");
+  $("target-name").textContent = entity.name;
+  $("target-level").textContent = `Cấp ${entity.level}`;
+  const ratio = entity.hp / Math.max(1, entity.maxHp);
+  $("target-hp-fill").style.width = `${Math.max(0, ratio) * 100}%`;
+  $("target-hp-text").textContent = `${Math.round(entity.hp)} / ${entity.maxHp}`;
+}
+
+function renderInventory() {
+  if (!self || !content) return;
+  const equipment = $("equipment-row");
+  equipment.replaceChildren();
+  const slotLabels: { key: "weapon" | "armor" | "accessory"; label: string }[] = [
+    { key: "weapon", label: "Vũ khí" },
+    { key: "armor", label: "Áo giáp" },
+    { key: "accessory", label: "Phụ kiện" },
+  ];
+  for (const slot of slotLabels) {
+    const item = self.items.find((entry) => entry.slot === slot.key);
+    const template = item ? content.items[item.templateId] : null;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `equip-slot${item ? " filled" : ""}`;
+    button.innerHTML = `<span>${slot.label}</span><small>${template ? template.name : "Trống"}</small>`;
+    button.title = template ? template.description : "Chưa trang bị";
+    if (item) {
+      button.addEventListener("click", () => net.emit("inventory:unequip", { slot: slot.key }));
+    }
+    equipment.appendChild(button);
+  }
+
+  const grid = $("inventory-grid");
+  grid.replaceChildren();
+  for (const item of self.items) {
+    const template = content.items[item.templateId];
+    if (!template) continue;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "inv-item";
+    button.dataset.rarity = template.rarity;
+    button.title = template.description;
+    const icon = document.createElement("span");
+    icon.className = "inv-icon";
+    icon.textContent = itemIcon(template.type);
+    const name = document.createElement("span");
+    name.className = "inv-name";
+    name.textContent = template.name;
+    button.append(icon, name);
+    if (item.quantity > 1) {
+      const qty = document.createElement("span");
+      qty.className = "inv-qty";
+      qty.textContent = `x${item.quantity}`;
+      button.appendChild(qty);
+    }
+    button.addEventListener("click", () => {
+      if (template.slot) {
+        net.emit("inventory:equip", { itemId: item.id });
+      } else if (template.type === "consumable") {
+        net.emit("inventory:use", { itemId: item.id });
+      } else {
+        notify(`${template.name}: ${template.description}`, "info");
+      }
+    });
+    grid.appendChild(button);
+  }
+}
+
+function itemIcon(type: string): string {
+  switch (type) {
+    case "weapon":
+      return "⚔";
+    case "armor":
+      return "衣";
+    case "accessory":
+      return "玉";
+    case "consumable":
+      return "丹";
+    default:
+      return "材";
+  }
+}
+
+function renderQuests() {
+  if (!self || !content) return;
+  const list = $("quest-list");
+  list.replaceChildren();
+  for (const quest of Object.values(content.quests)) {
+    const progress = self.quests.find((entry) => entry.id === quest.id);
+    const card = document.createElement("div");
+    card.className = `quest-card${progress?.status === "COMPLETED" ? " completed" : ""}`;
+    const title = document.createElement("h4");
+    title.textContent = quest.name;
+    const description = document.createElement("p");
+    description.textContent = quest.description;
+    const bar = document.createElement("div");
+    bar.className = "quest-progress";
+    const fill = document.createElement("div");
+    const current = progress?.progress ?? 0;
+    fill.style.width = `${Math.min(100, (current / quest.objective.count) * 100)}%`;
+    bar.appendChild(fill);
+    const footer = document.createElement("div");
+    footer.className = "quest-footer";
+    const reward = document.createElement("span");
+    reward.textContent = `${current}/${quest.objective.count} · ${quest.rewards.xp} XP · ${quest.rewards.gold} vàng`;
+    footer.appendChild(reward);
+
+    if (!progress) {
+      const button = document.createElement("button");
+      button.className = "btn";
+      button.textContent = "Nhận";
+      button.disabled = self.level < quest.requiredLevel;
+      button.title = self.level < quest.requiredLevel ? `Cần cấp ${quest.requiredLevel}` : "";
+      button.addEventListener("click", () => net.emit("quest:accept", { questId: quest.id }));
+      footer.appendChild(button);
+    } else if (progress.status === "ACTIVE" && progress.progress < quest.objective.count) {
+      const status = document.createElement("span");
+      status.textContent = "Đang làm";
+      footer.appendChild(status);
+    } else if (progress.status === "ACTIVE") {
+      const button = document.createElement("button");
+      button.className = "btn btn-primary";
+      button.textContent = "Báo công";
+      button.addEventListener("click", () => net.emit("quest:complete", { questId: quest.id }));
+      footer.appendChild(button);
+    } else {
+      const status = document.createElement("span");
+      status.textContent = "Đã hoàn thành";
+      footer.appendChild(status);
+    }
+    card.append(title, description, bar, footer);
+    list.appendChild(card);
+  }
+}
+
+function openPanel(panel: "inventory" | "quests") {
+  $("side-panel").classList.remove("hidden");
+  $("inventory-panel").classList.toggle("hidden", panel !== "inventory");
+  $("quests-panel").classList.toggle("hidden", panel !== "quests");
+  $("tab-inventory").classList.toggle("active", panel === "inventory");
+  $("tab-quests").classList.toggle("active", panel === "quests");
+  if (panel === "inventory") renderInventory();
+  else renderQuests();
+}
+
+function performAttack() {
+  if (!self || !game) return;
+  if (!target) {
+    notify("Hãy chọn mục tiêu trước (click hoặc Tab).", "info");
+    return;
+  }
+  const now = performance.now();
+  if (now < attackReadyAt) return;
+  attackReadyAt = now + 800;
+  net.emit("combat:attack", { targetId: target.id, targetType: target.kind });
+}
+
+function performSkill() {
+  if (!self || !content) return;
+  const skill = content.sects[self.sect].skill;
+  if (!target && skill.type !== "MELEE") {
+    notify("Hãy chọn mục tiêu cho tuyệt kỹ.", "info");
+    return;
+  }
+  if (self.mp < skill.mpCost) {
+    notify("Không đủ nội lực.", "danger");
+    return;
+  }
+  const now = performance.now();
+  if (now < skillReadyAt) return;
+  skillReadyAt = now + skill.cooldownMs;
+  net.emit("combat:skill", { targetId: target?.id ?? null, targetType: target?.kind ?? "monster" });
+}
+
+function usePotion() {
+  if (!self) return;
+  const now = performance.now();
+  if (now < potionReadyAt) return;
+  const potion = self.items.find((item) => item.templateId === "potion_hp");
+  if (!potion) {
+    notify("Bạn không còn Hồi Huyết Đan.", "danger");
+    return;
+  }
+  potionReadyAt = now + 1200;
+  net.emit("inventory:use", { itemId: potion.id });
+}
+
+function setupGameHud() {
+  $("pvp-toggle").addEventListener("click", () => {
+    if (self) net.emit("pvp:toggle", { enabled: !self.pvpEnabled });
+  });
+  $("panel-inventory-btn").addEventListener("click", () => openPanel("inventory"));
+  $("panel-quests-btn").addEventListener("click", () => openPanel("quests"));
+  $("tab-inventory").addEventListener("click", () => openPanel("inventory"));
+  $("tab-quests").addEventListener("click", () => openPanel("quests"));
+  $("close-panel").addEventListener("click", () => $("side-panel").classList.add("hidden"));
+  $("leave-btn").addEventListener("click", leaveGame);
+  $("action-attack").addEventListener("click", performAttack);
+  $("action-skill").addEventListener("click", performSkill);
+  $("action-potion").addEventListener("click", usePotion);
+
+  $<HTMLFormElement>("chat-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const input = $<HTMLInputElement>("chat-input");
+    const message = input.value.trim();
+    if (!message) return;
+    const channel = $<HTMLSelectElement>("chat-channel").value as "global" | "faction";
+    net.emit("chat:send", { channel, message });
+    input.value = "";
+    input.blur();
+  });
+
+  window.addEventListener("keydown", (event) => {
+    if (currentScreen !== "game") return;
+    const active = document.activeElement;
+    const typing = active instanceof HTMLInputElement || active instanceof HTMLSelectElement || active instanceof HTMLTextAreaElement;
+    if (typing) return;
+    if (event.code === "Tab") {
+      event.preventDefault();
+      const next = game?.cycleTarget() ?? null;
+      target = next;
+      updateTargetFrame();
+      return;
+    }
+    if (event.code === "Enter") {
+      event.preventDefault();
+      $<HTMLInputElement>("chat-input").focus();
+      return;
+    }
+    keys.add(event.code);
+    if (event.code === "Digit1") performAttack();
+    if (event.code === "Digit2") performSkill();
+    if (event.code === "Digit3") usePotion();
+    if (event.code === "KeyI") {
+      const visible = !$("side-panel").classList.contains("hidden");
+      if (visible && !$("inventory-panel").classList.contains("hidden")) $("side-panel").classList.add("hidden");
+      else openPanel("inventory");
+    }
+    if (event.code === "KeyJ") {
+      const visible = !$("side-panel").classList.contains("hidden");
+      if (visible && !$("quests-panel").classList.contains("hidden")) $("side-panel").classList.add("hidden");
+      else openPanel("quests");
+    }
+  });
+  window.addEventListener("keyup", (event) => {
+    keys.delete(event.code);
+  });
+  window.addEventListener("blur", () => keys.clear());
+}
+
+function movementLoop() {
+  requestAnimationFrame(movementLoop);
+  const now = performance.now();
+  const dt = Math.min(0.1, (now - lastFrameAt) / 1000);
+  lastFrameAt = now;
+  updateCooldowns(now);
+  if (currentScreen !== "game" || !game || !self || self.dead) return;
+
+  const basis = game.getMovementBasis();
+  let dx = 0;
+  let dz = 0;
+  if (keys.has("KeyW") || keys.has("ArrowUp")) {
+    dx += basis.forward.x;
+    dz += basis.forward.z;
+  }
+  if (keys.has("KeyS") || keys.has("ArrowDown")) {
+    dx -= basis.forward.x;
+    dz -= basis.forward.z;
+  }
+  if (keys.has("KeyD") || keys.has("ArrowRight")) {
+    dx += basis.right.x;
+    dz += basis.right.z;
+  }
+  if (keys.has("KeyA") || keys.has("ArrowLeft")) {
+    dx -= basis.right.x;
+    dz -= basis.right.z;
+  }
+  if (dx === 0 && dz === 0) return;
+
+  const length = Math.hypot(dx, dz);
+  dx /= length;
+  dz /= length;
+  const position = game.getLocalPosition();
+  if (!position) return;
+  const step = self.stats.moveSpeed * dt;
+  const radius = content?.world.radius ?? 110;
+  const nextX = Math.max(-radius, Math.min(radius, position.x + dx * step));
+  const nextZ = Math.max(-radius, Math.min(radius, position.z + dz * step));
+  if (content && crossesCityWall(content.world, position.x, position.z, nextX, nextZ)) return;
+  game.setLocalTarget(nextX, nextZ);
+  if (now - lastMoveSentAt > 90) {
+    lastMoveSentAt = now;
+    net.emit("player:move", { x: nextX, z: nextZ, rotation: Math.atan2(dx, dz) });
+  }
+}
+
+function updateCooldowns(now: number) {
+  if (!self || !content) return;
+  const attackRemaining = Math.max(0, attackReadyAt - now);
+  const skillRemaining = Math.max(0, skillReadyAt - now);
+  ($("cd-attack") as HTMLElement).style.transform = `scaleY(${Math.min(1, attackRemaining / 800)})`;
+  ($("cd-skill") as HTMLElement).style.transform = `scaleY(${Math.min(1, skillRemaining / content.sects[self.sect].skill.cooldownMs)})`;
+  ($("cd-attack") as HTMLElement).parentElement?.classList.toggle("disabled", attackRemaining > 0);
+}
+
+async function init() {
+  setupAuthTabs();
+  setupAuthForms();
+  setupCharacterCreation();
+  setupGameHud();
+  bindGameEvents();
+  movementLoop();
+
+  try {
+    content = await (await fetch("/api/content")).json() as Content;
+  } catch {
+    showAuthError("Không thể tải dữ liệu game. Kiểm tra server.");
+    return;
+  }
+  renderCreateOptions();
+
+  if (token) {
+    await openCharacterScreen();
+  } else {
+    showScreen("auth");
+  }
+}
+
+void init();
