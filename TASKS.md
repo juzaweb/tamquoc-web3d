@@ -1,0 +1,6 @@
+- [ ] Cho Thành lớn hơn, có npc để mua thuốc (máu, mana,...)
+- [ ] Cổng chính của thành chỉ mở pk pvp, ko có quái, quái ở 3 cổng còn lại, mỗi quái có 1 khu vực riêng.
+- [ ] Thêm tính năng reconnect khi bị out mạng.
+- [ ] Thêm hiệu ứng skill
+- [ ] Bỏ di chuyển bằng phím mũi tên, thay bằng di click chuột trái. Phím Q, W, E, R để dùng skill. Phím A, S để dùng item.
+- [ ] Update nhân vật thành các khối giống người hơn
