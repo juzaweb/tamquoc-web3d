@@ -1,6 +1,7 @@
-- [x] Cho Thành lớn hơn, có npc để mua thuốc (máu, mana,...) — chờ duyệt
-- [ ] Cổng chính của thành chỉ mở pk pvp, ko có quái, quái ở 3 cổng còn lại, mỗi quái có 1 khu vực riêng.
+- [x] Cho Thành lớn hơn, có npc để mua thuốc (máu, mana,...)
+- [x] Cổng chính của thành chỉ mở pk pvp, ko có quái, quái ở 3 cổng còn lại, mỗi quái có 1 khu vực riêng.
 - [ ] Thêm tính năng reconnect khi bị out mạng.
-- [ ] Thêm hiệu ứng skill
+- [ ] Thêm hiệu ứng skill: chưởng có hình bàn tay, lướt có hiệu ứng bụi, skill có hiệu ứng ánh sáng,...
 - [ ] Bỏ di chuyển bằng phím mũi tên, thay bằng di click chuột trái. Phím Q, W, E, R để dùng skill. Phím A, S để dùng item.
 - [ ] Thêm skill cho các phải (4 skill mỗi phái Q, W, E, R), vd: Thiếu Lâm có skill lướt đến mục tiêu làm choáng 1,2s,...
+- [ ] Mở rộng: mỗi thành là 1 map, ra ngoài thành là map khác (chuyển cảnh) => Mỗi thành có 1 cổng chính 3 cổng phụ 3x4 = 12 map

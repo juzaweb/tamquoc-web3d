@@ -41,7 +41,7 @@ export function buildEnvironment(scene: THREE.Scene, content: Content) {
     scene.add(sun);
 
     const ground = new THREE.Mesh(
-      new THREE.CircleGeometry(130, 80),
+      new THREE.CircleGeometry(content.world.radius + 25, 96),
       new THREE.MeshStandardMaterial({ map: grassTexture(), roughness: 1, metalness: 0 }),
     );
     ground.rotation.x = -Math.PI / 2;
@@ -105,7 +105,26 @@ function buildCities(scene: THREE.Scene, content: Content) {
       const city = content.world.cities.find((entry) => entry.faction === npc.faction);
       buildNpc(scene, npc.x, npc.z, npc.name, npc.interactRadius, city?.x ?? 0, city?.z ?? 0);
     }
+    buildMonsterZones(scene, content);
     buildBattlefield(scene);
+  }
+
+function buildMonsterZones(scene: THREE.Scene, content: Content) {
+    for (const zone of content.world.monsterZones) {
+      const monster = content.monsters[zone.monsterId];
+      const color = monster?.color ?? 0xe8dcc0;
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(zone.radius - 0.4, zone.radius, 64),
+        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.28, side: THREE.DoubleSide }),
+      );
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(zone.x, 0.06, zone.z);
+      scene.add(ring);
+
+      const label = textSprite(zone.name, "#e8dcc0", 5);
+      label.position.set(zone.x, 2.6, zone.z);
+      scene.add(label);
+    }
   }
 
 function buildNpc(
@@ -452,26 +471,28 @@ function banner(scene: THREE.Scene, x: number, z: number, color: number) {
 
 function buildNature(scene: THREE.Scene, content: Content) {
     const treePositions: [number, number, number][] = [];
-    for (let i = 0; i < 110; i += 1) {
+    for (let i = 0; i < 140; i += 1) {
       const angle = Math.random() * Math.PI * 2;
-      const radius = 22 + Math.random() * 88;
+      const radius = 22 + Math.random() * 115;
       const x = Math.cos(angle) * radius;
       const z = Math.sin(angle) * radius;
       if (Math.hypot(x - 47, z - 22) < 14) continue;
       if (Math.hypot(x, z) < 31) continue;
       const cityClear = content.world.wallHalf + 8;
       if (content.world.cities.some((city) => Math.abs(x - city.x) < cityClear && Math.abs(z - city.z) < cityClear)) continue;
+      if (content.world.monsterZones.some((zone) => Math.hypot(x - zone.x, z - zone.z) < zone.radius + 3)) continue;
       treePositions.push([x, z, 0.8 + Math.random() * 0.9]);
     }
     for (const [x, z, scale] of treePositions) tree(scene, x, z, scale);
 
-    for (let i = 0; i < 46; i += 1) {
+    for (let i = 0; i < 60; i += 1) {
       const angle = Math.random() * Math.PI * 2;
-      const radius = 18 + Math.random() * 92;
+      const radius = 18 + Math.random() * 125;
       const x = Math.cos(angle) * radius;
       const z = Math.sin(angle) * radius;
       const cityClear = content.world.wallHalf + 4;
       if (content.world.cities.some((city) => Math.abs(x - city.x) < cityClear && Math.abs(z - city.z) < cityClear)) continue;
+      if (content.world.monsterZones.some((zone) => Math.hypot(x - zone.x, z - zone.z) < zone.radius + 2)) continue;
       const rock = new THREE.Mesh(
         new THREE.DodecahedronGeometry(0.5 + Math.random() * 1.4),
         new THREE.MeshStandardMaterial({ color: 0x5b5f63, roughness: 1, flatShading: true }),
@@ -485,7 +506,7 @@ function buildNature(scene: THREE.Scene, content: Content) {
 
     for (let i = 0; i < 26; i += 1) {
       const angle = (i / 26) * Math.PI * 2 + Math.random() * 0.1;
-      const radius = 128 + Math.random() * 60;
+      const radius = 165 + Math.random() * 70;
       const height = 28 + Math.random() * 46;
       const mountain = new THREE.Mesh(
         new THREE.ConeGeometry(16 + Math.random() * 20, height, 5),

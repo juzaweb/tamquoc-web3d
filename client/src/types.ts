@@ -85,6 +85,17 @@ export interface NpcInfo {
   stock: NpcStockEntry[];
 }
 
+export interface MonsterZoneInfo {
+  id: string;
+  name: string;
+  monsterId: string;
+  city: FactionId;
+  gate: "NORTH" | "SOUTH" | "EAST" | "WEST";
+  x: number;
+  z: number;
+  radius: number;
+}
+
 export interface WorldInfo {
   radius: number;
   safeRadius: number;
@@ -95,6 +106,7 @@ export interface WorldInfo {
   gateHalf: number;
   cities: CityInfo[];
   npcs: NpcInfo[];
+  monsterZones: MonsterZoneInfo[];
   spawnPoints: Record<FactionId, { x: number; z: number }>;
 }
 

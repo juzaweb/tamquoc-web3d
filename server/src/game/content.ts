@@ -2,7 +2,7 @@ export type SectId = "SHAOLIN" | "WUDANG" | "EMEI" | "WUDU";
 export type FactionId = "HAN" | "SHU" | "WEI";
 
 export const MAX_LEVEL = 100;
-export const WORLD_RADIUS = 112;
+export const WORLD_RADIUS = 150;
 export const CITY_SAFE_RADIUS = 24.5;
 export const GATE_PK_RADIUS = 9;
 export const CITY_WALL_HALF = 24;
@@ -460,7 +460,7 @@ export const QUESTS: Record<string, QuestDefinition> = {
   q_wolves: {
     id: "q_wolves",
     name: "Sói Hoang Quấy Phá",
-    description: "Dẹp yên 5 con Sói Hoang quanh thành để bảo vệ dân chúng.",
+    description: "Dẹp yên 5 con Sói Hoang tại Đông Môn Hán Thành.",
     requiredLevel: 1,
     objective: { type: "kill", monsterId: "wolf", count: 5 },
     rewards: { xp: 220, gold: 180, items: [{ templateId: "potion_hp", quantity: 3 }] },
@@ -468,7 +468,7 @@ export const QUESTS: Record<string, QuestDefinition> = {
   q_bandits: {
     id: "q_bandits",
     name: "Trấn Áp Sơn Tặc",
-    description: "Tiêu diệt 6 Sơn Tặc đang cướp bóc trên đường ra chiến trường.",
+    description: "Tiêu diệt 6 Sơn Tặc đang cướp bóc tại Bắc Môn Ngụy Thành.",
     requiredLevel: 2,
     objective: { type: "kill", monsterId: "bandit", count: 6 },
     rewards: { xp: 520, gold: 420, items: [{ templateId: "armor_leather", quantity: 1 }] },
@@ -476,39 +476,12 @@ export const QUESTS: Record<string, QuestDefinition> = {
   q_snakes: {
     id: "q_snakes",
     name: "Độc Xà Trong Rừng",
-    description: "Loại bỏ 4 Yêu Xà để lấy lại bình yên cho khu rừng ngoại thành.",
+    description: "Loại bỏ 4 Yêu Xà tại Bắc Môn Thục Thành.",
     requiredLevel: 1,
     objective: { type: "kill", monsterId: "snake", count: 4 },
     rewards: { xp: 300, gold: 260, items: [{ templateId: "accessory_jade", quantity: 1 }] },
   },
 };
-
-export const MONSTER_SPAWNS: { monsterId: string; x: number; z: number; areaRadius: number }[] = [
-  { monsterId: "wolf", x: 0, z: -44, areaRadius: 9 },
-  { monsterId: "wolf", x: -20, z: -50, areaRadius: 8 },
-  { monsterId: "wolf", x: 20, z: -50, areaRadius: 8 },
-  { monsterId: "wolf", x: -44, z: 26, areaRadius: 7 },
-  { monsterId: "wolf", x: 44, z: 26, areaRadius: 7 },
-  { monsterId: "snake", x: -46, z: 16, areaRadius: 9 },
-  { monsterId: "snake", x: -46, z: 46, areaRadius: 8 },
-  { monsterId: "snake", x: -34, z: 54, areaRadius: 7 },
-  { monsterId: "snake", x: 46, z: 16, areaRadius: 9 },
-  { monsterId: "snake", x: 46, z: 46, areaRadius: 8 },
-  { monsterId: "snake", x: 34, z: 54, areaRadius: 7 },
-  { monsterId: "bandit", x: 0, z: -32, areaRadius: 9 },
-  { monsterId: "bandit", x: -32, z: -18, areaRadius: 9 },
-  { monsterId: "bandit", x: 32, z: -18, areaRadius: 9 },
-  { monsterId: "tiger", x: -32, z: 0, areaRadius: 9 },
-  { monsterId: "tiger", x: 32, z: 0, areaRadius: 9 },
-  { monsterId: "tiger", x: 0, z: 32, areaRadius: 9 },
-  { monsterId: "demon", x: -56, z: -34, areaRadius: 9 },
-  { monsterId: "demon", x: 56, z: -34, areaRadius: 9 },
-  { monsterId: "demon", x: -62, z: 68, areaRadius: 8 },
-  { monsterId: "demon", x: 62, z: 68, areaRadius: 8 },
-  { monsterId: "warlord", x: -17, z: -15, areaRadius: 7 },
-  { monsterId: "warlord", x: 17, z: -15, areaRadius: 7 },
-  { monsterId: "warlord", x: 0, z: 19, areaRadius: 7 },
-];
 
 export const BOSS_SPAWN = { monsterId: "black_dragon", x: 0, z: 0 };
 export const BOSS_INTERVAL_MS = 180_000;
@@ -591,9 +564,105 @@ export const SPAWN_POINTS: Record<FactionId, { x: number; z: number }> = {
   WEI: { x: 66, z: 30 },
 };
 
-export function cityGatePosition(city: CityDefinition): { x: number; z: number } {
-  if (city.mainGate === "NORTH") return { x: city.x, z: city.z + CITY_WALL_HALF };
-  if (city.mainGate === "SOUTH") return { x: city.x, z: city.z - CITY_WALL_HALF };
-  if (city.mainGate === "EAST") return { x: city.x + CITY_WALL_HALF, z: city.z };
-  return { x: city.x - CITY_WALL_HALF, z: city.z };
+export type GateDirection = "NORTH" | "SOUTH" | "EAST" | "WEST";
+
+export const GATE_DIRECTIONS: GateDirection[] = ["NORTH", "EAST", "SOUTH", "WEST"];
+
+const GATE_LABELS: Record<GateDirection, string> = {
+  NORTH: "Bắc",
+  SOUTH: "Nam",
+  EAST: "Đông",
+  WEST: "Tây",
+};
+
+function directionOffset(direction: GateDirection, distance: number): { x: number; z: number } {
+  if (direction === "NORTH") return { x: 0, z: distance };
+  if (direction === "SOUTH") return { x: 0, z: -distance };
+  if (direction === "EAST") return { x: distance, z: 0 };
+  return { x: -distance, z: 0 };
 }
+
+export function gatePosition(city: CityDefinition, direction: GateDirection): { x: number; z: number } {
+  const offset = directionOffset(direction, CITY_WALL_HALF);
+  return { x: city.x + offset.x, z: city.z + offset.z };
+}
+
+export function cityGatePosition(city: CityDefinition): { x: number; z: number } {
+  return gatePosition(city, city.mainGate);
+}
+
+export interface GateFarm {
+  gate: GateDirection;
+  monsterId: string;
+}
+
+export const GATE_FARMS: Record<FactionId, GateFarm[]> = {
+  HAN: [
+    { gate: "EAST", monsterId: "wolf" },
+    { gate: "SOUTH", monsterId: "tiger" },
+    { gate: "WEST", monsterId: "demon" },
+  ],
+  SHU: [
+    { gate: "NORTH", monsterId: "snake" },
+    { gate: "SOUTH", monsterId: "demon" },
+    { gate: "WEST", monsterId: "warlord" },
+  ],
+  WEI: [
+    { gate: "NORTH", monsterId: "bandit" },
+    { gate: "EAST", monsterId: "tiger" },
+    { gate: "SOUTH", monsterId: "warlord" },
+  ],
+};
+
+export const GATE_FARM_DISTANCE = CITY_WALL_HALF + 18;
+export const GATE_FARM_RADIUS = 11;
+
+export interface MonsterZone {
+  id: string;
+  name: string;
+  monsterId: string;
+  city: FactionId;
+  gate: GateDirection;
+  x: number;
+  z: number;
+  radius: number;
+}
+
+function gateFarmCenter(city: CityDefinition, gate: GateDirection): { x: number; z: number } {
+  const offset = directionOffset(gate, GATE_FARM_DISTANCE);
+  return { x: city.x + offset.x, z: city.z + offset.z };
+}
+
+export const MONSTER_ZONES: MonsterZone[] = (Object.keys(GATE_FARMS) as FactionId[]).flatMap((faction) => {
+  const city = CITIES[faction];
+  return GATE_FARMS[faction].map((farm) => {
+    const center = gateFarmCenter(city, farm.gate);
+    return {
+      id: `zone_${faction.toLowerCase()}_${farm.gate.toLowerCase()}`,
+      name: `Bãi ${MONSTERS[farm.monsterId]!.name} · ${GATE_LABELS[farm.gate]} Môn`,
+      monsterId: farm.monsterId,
+      city: faction,
+      gate: farm.gate,
+      x: center.x,
+      z: center.z,
+      radius: GATE_FARM_RADIUS,
+    };
+  });
+});
+
+const ZONE_SPAWN_OFFSETS = [
+  { x: 0, z: 0, areaRadius: 4.5 },
+  { x: -5, z: 3.5, areaRadius: 4 },
+  { x: 5, z: -3.5, areaRadius: 4 },
+  { x: 0, z: 6, areaRadius: 4 },
+];
+
+export const MONSTER_SPAWNS: { monsterId: string; x: number; z: number; areaRadius: number }[] =
+  MONSTER_ZONES.flatMap((zone) =>
+    ZONE_SPAWN_OFFSETS.map((offset) => ({
+      monsterId: zone.monsterId,
+      x: zone.x + offset.x,
+      z: zone.z + offset.z,
+      areaRadius: offset.areaRadius,
+    })),
+  );

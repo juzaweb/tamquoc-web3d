@@ -13,6 +13,7 @@ import {
   GATE_PK_RADIUS,
   ITEMS,
   MAX_LEVEL,
+  MONSTER_ZONES,
   MONSTERS,
   NPCS,
   QUESTS,
@@ -156,6 +157,7 @@ export async function registerRoutes(app: FastifyInstance) {
       gateHalf: CITY_GATE_HALF,
       cities: Object.values(CITIES).map((city) => ({ ...city, gate: cityGatePosition(city) })),
       npcs: NPCS,
+      monsterZones: MONSTER_ZONES,
       spawnPoints: SPAWN_POINTS,
     },
   }));
