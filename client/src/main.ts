@@ -974,12 +974,12 @@ function setupGameHud() {
       return;
     }
     keys.add(event.code);
-    if (event.code === "KeyQ" || event.code === "Digit1") performSkill("Q");
-    if (event.code === "KeyW" || event.code === "Digit2") performSkill("W");
-    if (event.code === "KeyE" || event.code === "Digit3") performSkill("E");
-    if (event.code === "KeyR" || event.code === "Digit4") performSkill("R");
-    if (event.code === "KeyA" || event.code === "Digit3") useHpPotion();
-    if (event.code === "KeyS") useMpPotion();
+    if (event.code === "KeyQ") performSkill("Q");
+    if (event.code === "KeyW") performSkill("W");
+    if (event.code === "KeyE") performSkill("E");
+    if (event.code === "KeyR") performSkill("R");
+    if (event.code === "Digit1" || event.code === "KeyA") useHpPotion();
+    if (event.code === "Digit2" || event.code === "KeyS") useMpPotion();
     if (event.code === "KeyF" && nearbyNpc) {
       event.preventDefault();
       openShop(nearbyNpc);
