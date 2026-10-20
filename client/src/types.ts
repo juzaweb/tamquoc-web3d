@@ -10,6 +10,7 @@ export interface SectDefinition {
   allowedGenders: Gender[];
   base: { strength: number; speed: number; intelligence: number };
   growth: { strength: number; speed: number; intelligence: number };
+  attackRange: number;
   skill: {
     id: string;
     name: string;
