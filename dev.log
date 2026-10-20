@@ -11,35 +11,25 @@
 [client] > vite
 [client]
 [client]
-[client]   VITE v6.4.4  ready in 250 ms
+[client]   VITE v6.4.4  ready in 379 ms
 [client]
 [client]   ➜  Local:   http://localhost:5173/
 [client]   ➜  Network: use --host to expose
-[server] {"level":30,"time":1792475245536,"pid":26610,"hostname":"devbox","msg":"Server listening at http://127.0.0.1:3001"}
-[server] {"level":30,"time":1792475245537,"pid":26610,"hostname":"devbox","msg":"Server listening at http://192.168.0.2:3001"}
-[server] {"level":30,"time":1792475293355,"pid":26610,"hostname":"devbox","reqId":"req-1","req":{"method":"GET","url":"/api/content","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":59278},"msg":"incoming request"}
-[server] {"level":30,"time":1792475293362,"pid":26610,"hostname":"devbox","reqId":"req-1","res":{"statusCode":200},"responseTime":6.207329999997455,"msg":"request completed"}
-[server] {"level":30,"time":1792475293701,"pid":26610,"hostname":"devbox","reqId":"req-2","req":{"method":"POST","url":"/api/auth/login","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":59106},"msg":"incoming request"}
-[server] {"level":30,"time":1792475293713,"pid":26610,"hostname":"devbox","reqId":"req-2","res":{"statusCode":401},"responseTime":11.557011999997485,"msg":"request completed"}
-[server] {"level":30,"time":1792475344050,"pid":26610,"hostname":"devbox","reqId":"req-3","req":{"method":"GET","url":"/api/content","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":34336},"msg":"incoming request"}
-[server] {"level":30,"time":1792475344051,"pid":26610,"hostname":"devbox","reqId":"req-3","res":{"statusCode":200},"responseTime":0.787544999999227,"msg":"request completed"}
-[server] {"level":30,"time":1792475344279,"pid":26610,"hostname":"devbox","reqId":"req-4","req":{"method":"POST","url":"/api/auth/register","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":34350},"msg":"incoming request"}
-[server] {"level":30,"time":1792475344453,"pid":26610,"hostname":"devbox","reqId":"req-4","res":{"statusCode":200},"responseTime":173.84852499999397,"msg":"request completed"}
-[server] {"level":30,"time":1792475344477,"pid":26610,"hostname":"devbox","reqId":"req-5","req":{"method":"GET","url":"/api/auth/me","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":34354},"msg":"incoming request"}
-[server] {"level":30,"time":1792475344480,"pid":26610,"hostname":"devbox","reqId":"req-5","res":{"statusCode":200},"responseTime":2.3006880000029923,"msg":"request completed"}
-[server] {"level":30,"time":1792475344487,"pid":26610,"hostname":"devbox","reqId":"req-6","req":{"method":"GET","url":"/api/characters","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":34364},"msg":"incoming request"}
-[server] {"level":30,"time":1792475344490,"pid":26610,"hostname":"devbox","reqId":"req-6","res":{"statusCode":200},"responseTime":3.459694999997737,"msg":"request completed"}
-[server] {"level":30,"time":1792475345373,"pid":26610,"hostname":"devbox","reqId":"req-7","req":{"method":"POST","url":"/api/characters","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":34378},"msg":"incoming request"}
-[server] {"level":30,"time":1792475345387,"pid":26610,"hostname":"devbox","reqId":"req-7","res":{"statusCode":201},"responseTime":14.142636999997194,"msg":"request completed"}
-[server] {"level":30,"time":1792475345395,"pid":26610,"hostname":"devbox","reqId":"req-8","req":{"method":"GET","url":"/api/characters","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":34390},"msg":"incoming request"}
-[server] {"level":30,"time":1792475345399,"pid":26610,"hostname":"devbox","reqId":"req-8","res":{"statusCode":200},"responseTime":3.204914000001736,"msg":"request completed"}
-[server] {"level":30,"time":1792475406582,"pid":26610,"hostname":"devbox","reqId":"req-9","req":{"method":"GET","url":"/api/content","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":49758},"msg":"incoming request"}
-[server] {"level":30,"time":1792475406583,"pid":26610,"hostname":"devbox","reqId":"req-9","res":{"statusCode":200},"responseTime":1.5050780000165105,"msg":"request completed"}
-[server] {"level":30,"time":1792475406801,"pid":26610,"hostname":"devbox","reqId":"req-a","req":{"method":"POST","url":"/api/auth/register","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":49772},"msg":"incoming request"}
-[server] {"level":30,"time":1792475406804,"pid":26610,"hostname":"devbox","reqId":"req-a","res":{"statusCode":409},"responseTime":2.6364370000083,"msg":"request completed"}
-[server] {"level":30,"time":1792475407916,"pid":26610,"hostname":"devbox","reqId":"req-b","req":{"method":"POST","url":"/api/auth/login","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":49780},"msg":"incoming request"}
-[server] {"level":30,"time":1792475408053,"pid":26610,"hostname":"devbox","reqId":"req-b","res":{"statusCode":200},"responseTime":136.86109799999394,"msg":"request completed"}
-[server] {"level":30,"time":1792475408060,"pid":26610,"hostname":"devbox","reqId":"req-c","req":{"method":"GET","url":"/api/auth/me","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":49786},"msg":"incoming request"}
-[server] {"level":30,"time":1792475408061,"pid":26610,"hostname":"devbox","reqId":"req-c","res":{"statusCode":200},"responseTime":0.9291200000152458,"msg":"request completed"}
-[server] {"level":30,"time":1792475408067,"pid":26610,"hostname":"devbox","reqId":"req-d","req":{"method":"GET","url":"/api/characters","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":49794},"msg":"incoming request"}
-[server] {"level":30,"time":1792475408070,"pid":26610,"hostname":"devbox","reqId":"req-d","res":{"statusCode":200},"responseTime":2.915854000020772,"msg":"request completed"}
+[server] {"level":30,"time":1792477365134,"pid":34744,"hostname":"devbox","msg":"Server listening at http://127.0.0.1:3001"}
+[server] {"level":30,"time":1792477365134,"pid":34744,"hostname":"devbox","msg":"Server listening at http://192.168.0.2:3001"}
+[server] {"level":30,"time":1792477402633,"pid":34744,"hostname":"devbox","reqId":"req-1","req":{"method":"GET","url":"/api/content","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":35796},"msg":"incoming request"}
+[server] {"level":30,"time":1792477402640,"pid":34744,"hostname":"devbox","reqId":"req-1","res":{"statusCode":200},"responseTime":6.197181000003184,"msg":"request completed"}
+[server] {"level":30,"time":1792477403090,"pid":34744,"hostname":"devbox","reqId":"req-2","req":{"method":"POST","url":"/api/auth/register","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":58564},"msg":"incoming request"}
+[server] {"level":30,"time":1792477403268,"pid":34744,"hostname":"devbox","reqId":"req-2","res":{"statusCode":200},"responseTime":177.72536299999774,"msg":"request completed"}
+[server] {"level":30,"time":1792477403289,"pid":34744,"hostname":"devbox","reqId":"req-3","req":{"method":"GET","url":"/api/auth/me","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":58568},"msg":"incoming request"}
+[server] {"level":30,"time":1792477403292,"pid":34744,"hostname":"devbox","reqId":"req-3","res":{"statusCode":200},"responseTime":3.0196040000009816,"msg":"request completed"}
+[server] {"level":30,"time":1792477403299,"pid":34744,"hostname":"devbox","reqId":"req-4","req":{"method":"GET","url":"/api/characters","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":58574},"msg":"incoming request"}
+[server] {"level":30,"time":1792477403302,"pid":34744,"hostname":"devbox","reqId":"req-4","res":{"statusCode":200},"responseTime":3.036846000002697,"msg":"request completed"}
+[server] {"level":30,"time":1792477403455,"pid":34744,"hostname":"devbox","reqId":"req-5","req":{"method":"POST","url":"/api/characters","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":58584},"msg":"incoming request"}
+[server] {"level":30,"time":1792477403476,"pid":34744,"hostname":"devbox","reqId":"req-5","res":{"statusCode":201},"responseTime":21.309941999999864,"msg":"request completed"}
+[server] {"level":30,"time":1792477403485,"pid":34744,"hostname":"devbox","reqId":"req-6","req":{"method":"GET","url":"/api/characters","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":58596},"msg":"incoming request"}
+[server] {"level":30,"time":1792477403488,"pid":34744,"hostname":"devbox","reqId":"req-6","res":{"statusCode":200},"responseTime":3.5609929999991436,"msg":"request completed"}
+[server] {"level":30,"time":1792477433360,"pid":34744,"hostname":"devbox","signal":"SIGTERM","msg":"Shutting down"}
+[server] {"level":30,"time":1792477433364,"pid":34744,"hostname":"devbox","signal":"SIGTERM","msg":"Shutting down"}
+[client] npm run dev:client exited with code SIGTERM
+[server] npm run dev:server exited with code SIGTERM
