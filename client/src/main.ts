@@ -70,16 +70,97 @@ async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 function checkOrientation() {
   const isPortrait = window.matchMedia("(orientation: portrait)").matches || window.innerHeight > window.innerWidth;
-  const isMobileOrTablet = window.innerWidth <= 1024 || window.innerHeight <= 1024 || "ontouchstart" in window;
+  const isMobileOrTablet = window.innerWidth <= 1024 || window.innerHeight <= 1024 || "ontouchstart" in window || isMobileDevice();
   const overlay = $("orientation-overlay");
   overlay.classList.toggle("hidden", !(isPortrait && isMobileOrTablet));
+}
+
+async function requestFullscreenAndLandscape() {
+  const docEl = document.documentElement as HTMLElement & {
+    requestFullscreen?: () => Promise<void>;
+    webkitRequestFullscreen?: () => Promise<void>;
+    mozRequestFullScreen?: () => Promise<void>;
+    msRequestFullscreen?: () => Promise<void>;
+  };
+
+  const isFullscreen = Boolean(
+    document.fullscreenElement
+      || (document as unknown as { webkitFullscreenElement?: Element }).webkitFullscreenElement
+      || (document as unknown as { mozFullScreenElement?: Element }).mozFullScreenElement,
+  );
+
+  if (!isFullscreen) {
+    try {
+      if (docEl.requestFullscreen) {
+        await docEl.requestFullscreen();
+      } else if (docEl.webkitRequestFullscreen) {
+        await docEl.webkitRequestFullscreen();
+      } else if (docEl.mozRequestFullScreen) {
+        await docEl.mozRequestFullScreen();
+      } else if (docEl.msRequestFullscreen) {
+        await docEl.msRequestFullscreen();
+      }
+    } catch {
+      // Fullscreen request might fail if not supported or blocked by browser
+    }
+  }
+
+  if (screen.orientation && "lock" in screen.orientation) {
+    try {
+      await (screen.orientation.lock as (orientation: string) => Promise<void>)("landscape");
+    } catch {
+      // Ignore orientation lock rejection
+    }
+  }
+
+  checkOrientation();
+}
+
+async function toggleFullscreen() {
+  const isFullscreen = Boolean(
+    document.fullscreenElement
+      || (document as unknown as { webkitFullscreenElement?: Element }).webkitFullscreenElement
+      || (document as unknown as { mozFullScreenElement?: Element }).mozFullScreenElement,
+  );
+
+  if (isFullscreen) {
+    const doc = document as Document & {
+      exitFullscreen?: () => Promise<void>;
+      webkitExitFullscreen?: () => Promise<void>;
+      mozCancelFullScreen?: () => Promise<void>;
+      msExitFullscreen?: () => Promise<void>;
+    };
+    try {
+      if (doc.exitFullscreen) {
+        await doc.exitFullscreen();
+      } else if (doc.webkitExitFullscreen) {
+        await doc.webkitExitFullscreen();
+      } else if (doc.mozCancelFullScreen) {
+        await doc.mozCancelFullScreen();
+      } else if (doc.msExitFullscreen) {
+        await doc.msExitFullscreen();
+      }
+    } catch {
+      // Ignore exit fullscreen rejection
+    }
+  } else {
+    await requestFullscreenAndLandscape();
+  }
 }
 
 function requestLandscapeLock() {
   if (screen.orientation && "lock" in screen.orientation) {
     (screen.orientation.lock as (orientation: string) => Promise<void>)("landscape").catch(() => {
-      // Ignore orientation lock rejection on unsupported browsers or without user activation
+      // Ignore orientation lock rejection
     });
+  }
+}
+
+let autoFullscreenTriggered = false;
+function tryAutoMobileLandscape() {
+  if (isMobileDevice() && !autoFullscreenTriggered) {
+    autoFullscreenTriggered = true;
+    void requestFullscreenAndLandscape();
   }
 }
 
@@ -969,6 +1050,9 @@ function setupGameHud() {
   $("pvp-toggle").addEventListener("click", () => {
     if (self) net.emit("pvp:toggle", { enabled: !self.pvpEnabled });
   });
+  $("fullscreen-btn")?.addEventListener("click", () => {
+    void toggleFullscreen();
+  });
   $("panel-inventory-btn").addEventListener("click", () => openPanel("inventory"));
   $("panel-quests-btn").addEventListener("click", () => openPanel("quests"));
   $("tab-inventory").addEventListener("click", () => openPanel("inventory"));
@@ -1121,8 +1205,22 @@ async function init() {
 
   window.addEventListener("resize", checkOrientation);
   window.addEventListener("orientationchange", checkOrientation);
-  window.addEventListener("click", requestLandscapeLock, { once: false });
-  window.addEventListener("touchstart", requestLandscapeLock, { once: false, passive: true });
+  document.addEventListener("fullscreenchange", checkOrientation);
+  document.addEventListener("webkitfullscreenchange", checkOrientation);
+
+  $("rotate-fullscreen-btn")?.addEventListener("click", () => {
+    void requestFullscreenAndLandscape();
+  });
+
+  window.addEventListener("click", () => {
+    tryAutoMobileLandscape();
+    requestLandscapeLock();
+  });
+  window.addEventListener("touchstart", () => {
+    tryAutoMobileLandscape();
+    requestLandscapeLock();
+  }, { passive: true });
+
   checkOrientation();
 
   try {
