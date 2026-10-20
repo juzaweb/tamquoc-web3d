@@ -26,13 +26,17 @@ interface EntityView {
   labelHeight: number;
   isBoss: boolean;
   dead: boolean;
+  sect?: SectId;
+  faction?: FactionId;
+  lastDustTime?: number;
 }
 
 interface Effect {
-  mesh: THREE.Mesh;
+  object: THREE.Object3D;
   life: number;
   maxLife: number;
-  growth: number;
+  light?: THREE.PointLight;
+  update?: (dt: number, progress: number) => void;
 }
 
 class NameLabel {
@@ -262,6 +266,8 @@ export class GameClient {
       labelHeight,
       isBoss: false,
       dead: player.dead,
+      sect: player.sect,
+      faction: player.faction,
     };
   }
 
@@ -585,6 +591,8 @@ export class GameClient {
           entity.targetZ = player.z;
         }
       }
+      entity.sect = player.sect;
+      entity.faction = player.faction;
       entity.group.visible = !player.dead;
       this.updateLabel(entity, player.name, player.hp / Math.max(1, player.maxHp), factionHex(player.faction));
     }
@@ -690,12 +698,40 @@ export class GameClient {
   }
 
   playCombat(event: CombatEvent) {
-    const entity = this.entities.get(event.targetId);
-    if (!entity) return;
-    const position = entity.group.position.clone();
-    position.y += event.targetType === "monster" ? entity.labelHeight * 0.5 : 1.7;
-    this.spawnDamageNumber(position, event);
-    this.spawnImpact(entity.group.position, event.skill ? 0xffd166 : 0xff8a80);
+    const targetEntity = this.entities.get(event.targetId);
+    const attackerEntity = this.entities.get(event.attackerId);
+    if (!targetEntity) return;
+
+    const targetPos = targetEntity.group.position.clone();
+    const attackerPos = attackerEntity ? attackerEntity.group.position.clone() : targetPos.clone();
+    const attackerRot = attackerEntity ? attackerEntity.group.rotation.y : 0;
+
+    const numberPos = targetPos.clone();
+    numberPos.y += event.targetType === "monster" ? targetEntity.labelHeight * 0.5 : 1.7;
+    this.spawnDamageNumber(numberPos, event);
+
+    if (event.skill) {
+      const sect = attackerEntity?.sect;
+      if (sect === "SHAOLIN") {
+        this.spawnShaolinPalmSkill(attackerPos, targetPos, attackerRot);
+      } else if (sect === "WUDU") {
+        this.spawnWuduPoisonPalmSkill(attackerPos, targetPos);
+      } else if (sect === "WUDANG") {
+        this.spawnWudangSwordSkill(attackerPos, targetPos, attackerRot);
+      } else if (sect === "EMEI") {
+        this.spawnEmeiLightSkill(attackerPos.distanceTo(targetPos) < 2 ? attackerPos : targetPos);
+      } else {
+        // Fallback or Boss / Monster Skill
+        this.spawnShaolinPalmSkill(attackerPos, targetPos, attackerRot);
+      }
+      this.spawnImpact(targetPos, 0xffd166, 2.5, 0xffa726);
+    } else {
+      // Basic Attack
+      if (attackerEntity?.sect === "SHAOLIN" || attackerEntity?.sect === "WUDU") {
+        this.spawnShaolinPalmSkill(attackerPos, targetPos, attackerRot, 1.1);
+      }
+      this.spawnImpact(targetPos, 0xff8a80, 1.2, 0xff5252);
+    }
   }
 
   playBossSpawn(id: string) {
@@ -720,17 +756,339 @@ export class GameClient {
     setTimeout(() => div.remove(), 900);
   }
 
-  private spawnImpact(position: THREE.Vector3, color: number, size = 1) {
+  private createPalmGroup(color: number, scale = 1): THREE.Group {
+    const group = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({
+      color,
+      emissive: color,
+      emissiveIntensity: 1.8,
+      roughness: 0.2,
+      metalness: 0.1,
+      transparent: true,
+      opacity: 0.9,
+    });
+
+    // Central palm mesh
+    const palm = new THREE.Mesh(new THREE.BoxGeometry(0.7 * scale, 0.16 * scale, 0.75 * scale), mat);
+    palm.position.set(0, 0, 0);
+    group.add(palm);
+
+    // Core energy sphere
+    const core = new THREE.Mesh(
+      new THREE.SphereGeometry(0.25 * scale, 12, 12),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95 }),
+    );
+    core.position.set(0, 0.08 * scale, 0);
+    group.add(core);
+
+    // Fingers
+    const fingers = [
+      { x: -0.42 * scale, z: -0.1 * scale, w: 0.18, h: 0.12, l: 0.42, rotY: -0.5 }, // Thumb
+      { x: -0.26 * scale, z: 0.6 * scale, w: 0.15, h: 0.12, l: 0.55, rotY: -0.05 }, // Index
+      { x: 0.0 * scale, z: 0.68 * scale, w: 0.16, h: 0.12, l: 0.65, rotY: 0 },      // Middle
+      { x: 0.26 * scale, z: 0.62 * scale, w: 0.15, h: 0.12, l: 0.58, rotY: 0.05 },  // Ring
+      { x: 0.46 * scale, z: 0.46 * scale, w: 0.13, h: 0.11, l: 0.45, rotY: 0.2 },   // Pinky
+    ];
+
+    for (const f of fingers) {
+      const finger = new THREE.Mesh(
+        new THREE.BoxGeometry(f.w * scale, f.h * scale, f.l * scale),
+        mat,
+      );
+      finger.position.set(f.x, 0, f.z);
+      finger.rotation.y = f.rotY;
+      group.add(finger);
+    }
+
+    // Outer glowing aura ring
+    const aura = new THREE.Mesh(
+      new THREE.RingGeometry(0.5 * scale, 0.85 * scale, 24),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.7, side: THREE.DoubleSide }),
+    );
+    aura.rotation.x = -Math.PI / 2;
+    group.add(aura);
+
+    return group;
+  }
+
+  private spawnDustPuff(pos: THREE.Vector3, rotationY: number) {
+    const count = 1 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < count; i += 1) {
+      const size = 0.18 + Math.random() * 0.16;
+      const geo = new THREE.DodecahedronGeometry(size, 0);
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0xd2c29d,
+        transparent: true,
+        opacity: 0.55,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      const backAngle = rotationY + Math.PI + (Math.random() - 0.5) * 0.8;
+      const dist = 0.2 + Math.random() * 0.35;
+      mesh.position.set(
+        pos.x + Math.sin(backAngle) * dist,
+        0.08 + Math.random() * 0.08,
+        pos.z + Math.cos(backAngle) * dist,
+      );
+      mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
+      this.scene.add(mesh);
+
+      const vx = (Math.random() - 0.5) * 0.5;
+      const vz = (Math.random() - 0.5) * 0.5;
+      const vy = 0.4 + Math.random() * 0.4;
+
+      this.effects.push({
+        object: mesh,
+        life: 0,
+        maxLife: 0.4 + Math.random() * 0.25,
+        update: (dt, progress) => {
+          mesh.position.x += vx * dt;
+          mesh.position.y += vy * dt;
+          mesh.position.z += vz * dt;
+          mesh.scale.setScalar(1 + progress * 2.2);
+          mat.opacity = Math.max(0, 0.55 * (1 - progress));
+        },
+      });
+    }
+  }
+
+  private spawnShaolinPalmSkill(
+    attackerPos: THREE.Vector3,
+    targetPos: THREE.Vector3,
+    attackerRot: number,
+    scaleMult = 2.2,
+  ) {
+    const palmGroup = this.createPalmGroup(0xffd700, scaleMult);
+    palmGroup.position.copy(attackerPos);
+    palmGroup.position.y += 1.2;
+
+    const dir = new THREE.Vector3().subVectors(targetPos, attackerPos);
+    const angle = dir.lengthSq() > 0.01 ? Math.atan2(dir.x, dir.z) : attackerRot;
+    palmGroup.rotation.y = angle;
+
+    const light = new THREE.PointLight(0xffd700, 8, 14);
+    light.position.set(0, 0, 0);
+    palmGroup.add(light);
+
+    this.scene.add(palmGroup);
+
+    const startX = palmGroup.position.x;
+    const startZ = palmGroup.position.z;
+    const forwardX = Math.sin(angle);
+    const forwardZ = Math.cos(angle);
+
+    this.effects.push({
+      object: palmGroup,
+      life: 0,
+      maxLife: 0.55,
+      light,
+      update: (_dt, progress) => {
+        const moveDist = progress * 4.5;
+        palmGroup.position.x = startX + forwardX * moveDist;
+        palmGroup.position.z = startZ + forwardZ * moveDist;
+        palmGroup.scale.setScalar(scaleMult * (1 + progress * 0.7));
+        light.intensity = Math.max(0, 8 * (1 - progress));
+        palmGroup.traverse((child) => {
+          if (child instanceof THREE.Mesh && child.material) {
+            const mat = child.material as THREE.Material;
+            if ("opacity" in mat) (mat as THREE.MeshBasicMaterial).opacity = Math.max(0, 0.9 * (1 - progress));
+          }
+        });
+      },
+    });
+  }
+
+  private spawnWuduPoisonPalmSkill(attackerPos: THREE.Vector3, targetPos: THREE.Vector3) {
+    const palmGroup = this.createPalmGroup(0x33ff66, 1.4);
+    palmGroup.position.copy(attackerPos);
+    palmGroup.position.y += 1.2;
+
+    const dir = new THREE.Vector3().subVectors(targetPos, attackerPos);
+    const dist = dir.length();
+    const angle = Math.atan2(dir.x, dir.z);
+    palmGroup.rotation.y = angle;
+
+    const light = new THREE.PointLight(0x00ff66, 7, 12);
+    palmGroup.add(light);
+    this.scene.add(palmGroup);
+
+    let lastSparkleTime = 0;
+
+    this.effects.push({
+      object: palmGroup,
+      life: 0,
+      maxLife: Math.max(0.3, Math.min(0.65, dist / 22)),
+      light,
+      update: (_dt, progress) => {
+        palmGroup.position.lerpVectors(
+          new THREE.Vector3(attackerPos.x, 1.2, attackerPos.z),
+          new THREE.Vector3(targetPos.x, 1.2, targetPos.z),
+          progress,
+        );
+        light.intensity = Math.max(0, 7 * (1 - progress * 0.4));
+
+        if (progress - lastSparkleTime > 0.08) {
+          lastSparkleTime = progress;
+          this.spawnLightSparkle(palmGroup.position, 0x00ff66, 0.8);
+        }
+
+        if (progress >= 0.95) {
+          this.spawnImpact(targetPos, 0x00ff66, 2.5, 0x33ff66);
+        }
+      },
+    });
+  }
+
+  private spawnWudangSwordSkill(attackerPos: THREE.Vector3, targetPos: THREE.Vector3, attackerRot: number) {
+    const group = new THREE.Group();
+    const geo = new THREE.TorusGeometry(1.5, 0.12, 8, 24, Math.PI * 0.8);
+    const mat = new THREE.MeshBasicMaterial({ color: 0x00e5ff, transparent: true, opacity: 0.9, side: THREE.DoubleSide });
+    const crescent = new THREE.Mesh(geo, mat);
+    crescent.rotation.x = Math.PI / 2;
+    group.add(crescent);
+
+    const innerGeo = new THREE.TorusGeometry(1.4, 0.06, 8, 24, Math.PI * 0.8);
+    const innerMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95 });
+    const inner = new THREE.Mesh(innerGeo, innerMat);
+    inner.rotation.x = Math.PI / 2;
+    group.add(inner);
+
+    const dir = new THREE.Vector3().subVectors(targetPos, attackerPos);
+    const angle = dir.lengthSq() > 0.01 ? Math.atan2(dir.x, dir.z) : attackerRot;
+    group.position.copy(attackerPos);
+    group.position.y += 1.1;
+    group.rotation.y = angle;
+
+    const light = new THREE.PointLight(0x00e5ff, 8, 14);
+    group.add(light);
+    this.scene.add(group);
+
+    const startX = group.position.x;
+    const startZ = group.position.z;
+    const forwardX = Math.sin(angle);
+    const forwardZ = Math.cos(angle);
+
+    this.effects.push({
+      object: group,
+      life: 0,
+      maxLife: 0.5,
+      light,
+      update: (_dt, progress) => {
+        const travel = progress * 12;
+        group.position.x = startX + forwardX * travel;
+        group.position.z = startZ + forwardZ * travel;
+        group.scale.setScalar(1 + progress * 0.6);
+        light.intensity = Math.max(0, 8 * (1 - progress));
+        mat.opacity = Math.max(0, 0.9 * (1 - progress));
+        innerMat.opacity = Math.max(0, 0.95 * (1 - progress));
+      },
+    });
+
+    this.spawnImpact(targetPos, 0x00e5ff, 2.8, 0x80efff);
+  }
+
+  private spawnEmeiLightSkill(position: THREE.Vector3) {
+    const group = new THREE.Group();
+    group.position.copy(position);
+
+    const pillarGeo = new THREE.CylinderGeometry(1.2, 1.8, 12, 16, 1, true);
+    const pillarMat = new THREE.MeshBasicMaterial({
+      color: 0xffea78,
+      transparent: true,
+      opacity: 0.75,
+      side: THREE.DoubleSide,
+    });
+    const pillar = new THREE.Mesh(pillarGeo, pillarMat);
+    pillar.position.y = 6;
+    group.add(pillar);
+
+    const ringGeo = new THREE.RingGeometry(0.5, 3.5, 32);
+    const ringMat = new THREE.MeshBasicMaterial({ color: 0xffd166, transparent: true, opacity: 0.85, side: THREE.DoubleSide });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.1;
+    group.add(ring);
+
+    const light = new THREE.PointLight(0xffea78, 10, 16);
+    light.position.y = 2;
+    group.add(light);
+
+    this.scene.add(group);
+
+    for (let i = 0; i < 10; i += 1) {
+      const sparkPos = position.clone().add(new THREE.Vector3(
+        (Math.random() - 0.5) * 2.5,
+        Math.random() * 3,
+        (Math.random() - 0.5) * 2.5,
+      ));
+      this.spawnLightSparkle(sparkPos, 0xffffff, 1.2);
+    }
+
+    this.effects.push({
+      object: group,
+      life: 0,
+      maxLife: 0.8,
+      light,
+      update: (_dt, progress) => {
+        light.intensity = Math.max(0, 10 * (1 - progress));
+        pillarMat.opacity = Math.max(0, 0.75 * (1 - progress));
+        ringMat.opacity = Math.max(0, 0.85 * (1 - progress));
+        group.scale.set(1 + progress * 0.3, 1, 1 + progress * 0.3);
+      },
+    });
+  }
+
+  private spawnLightSparkle(pos: THREE.Vector3, color: number, scale = 1) {
+    const mesh = new THREE.Mesh(
+      new THREE.SphereGeometry(0.12 * scale, 8, 8),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95 }),
+    );
+    mesh.position.copy(pos);
+    this.scene.add(mesh);
+
+    const vy = 1.2 + Math.random() * 1.5;
+
+    this.effects.push({
+      object: mesh,
+      life: 0,
+      maxLife: 0.4,
+      update: (dt, progress) => {
+        mesh.position.y += vy * dt;
+        mesh.scale.setScalar(Math.max(0, scale * (1 - progress)));
+        (mesh.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 0.95 * (1 - progress));
+      },
+    });
+  }
+
+  private spawnImpact(position: THREE.Vector3, color: number, size = 1, lightColor?: number) {
+    const group = new THREE.Group();
+    group.position.copy(position);
+
     const mesh = new THREE.Mesh(
       new THREE.RingGeometry(0.35, 0.55, 28),
       new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, side: THREE.DoubleSide }),
     );
     mesh.rotation.x = -Math.PI / 2;
-    mesh.position.copy(position);
     mesh.position.y = 0.2;
     mesh.scale.setScalar(size);
-    this.scene.add(mesh);
-    this.effects.push({ mesh, life: 0, maxLife: 0.45, growth: 6 });
+    group.add(mesh);
+
+    const light = new THREE.PointLight(lightColor ?? color, 6 * size, 10 * size);
+    light.position.y = 0.5;
+    group.add(light);
+
+    this.scene.add(group);
+
+    this.effects.push({
+      object: group,
+      life: 0,
+      maxLife: 0.45,
+      light,
+      update: (_dt, progress) => {
+        mesh.scale.setScalar(size * (1 + progress * 5));
+        (mesh.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 0.9 * (1 - progress));
+        light.intensity = Math.max(0, 6 * size * (1 - progress));
+      },
+    });
   }
 
   private resize() {
@@ -753,6 +1111,8 @@ export class GameClient {
 
   private updateEntities(dt: number) {
     const lerp = 1 - Math.exp(-dt * 9);
+    const nowSec = performance.now() * 0.001;
+
     for (const entity of this.entities.values()) {
       const group = entity.group;
       const dx = entity.targetX - group.position.x;
@@ -766,6 +1126,11 @@ export class GameClient {
         while (diff < -Math.PI) diff += Math.PI * 2;
         group.rotation.y += diff * Math.min(1, dt * 10);
         entity.walkTime += dt;
+
+        if (!entity.lastDustTime || nowSec - entity.lastDustTime > 0.09) {
+          entity.lastDustTime = nowSec;
+          this.spawnDustPuff(group.position, group.rotation.y);
+        }
       }
       const swing = moving ? Math.sin(entity.walkTime * 10) * 0.55 : 0;
       entity.limbs.forEach((limb, index) => {
@@ -806,13 +1171,15 @@ export class GameClient {
     for (let i = this.effects.length - 1; i >= 0; i -= 1) {
       const effect = this.effects[i]!;
       effect.life += dt;
-      const progress = effect.life / effect.maxLife;
-      effect.mesh.scale.setScalar(1 + progress * effect.growth);
-      (effect.mesh.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 0.9 * (1 - progress));
+      const progress = Math.min(1, effect.life / effect.maxLife);
+
+      if (effect.update) {
+        effect.update(dt, progress);
+      }
+
       if (effect.life >= effect.maxLife) {
-        this.scene.remove(effect.mesh);
-        effect.mesh.geometry.dispose();
-        (effect.mesh.material as THREE.Material).dispose();
+        this.scene.remove(effect.object);
+        this.disposeObject(effect.object);
         this.effects.splice(i, 1);
       }
     }
@@ -820,16 +1187,21 @@ export class GameClient {
 
   private disposeObject(object: THREE.Object3D) {
     object.traverse((child) => {
+      if (child instanceof THREE.Light) {
+        child.dispose?.();
+      }
       const materials = child instanceof THREE.Mesh || child instanceof THREE.Sprite
         ? Array.isArray(child.material) ? child.material : [child.material]
         : [];
       for (const material of materials) {
-        if (material instanceof THREE.SpriteMaterial || material instanceof THREE.MeshStandardMaterial) {
+        if (material instanceof THREE.SpriteMaterial || material instanceof THREE.MeshStandardMaterial || material instanceof THREE.MeshBasicMaterial) {
           material.map?.dispose();
         }
         material.dispose();
       }
-      if (child instanceof THREE.Mesh) child.geometry.dispose();
+      if ("geometry" in child && (child as { geometry?: THREE.BufferGeometry }).geometry) {
+        (child as { geometry: THREE.BufferGeometry }).geometry.dispose();
+      }
     });
   }
 
