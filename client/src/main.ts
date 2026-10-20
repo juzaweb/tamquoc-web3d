@@ -290,7 +290,8 @@ function renderCreateOptions() {
     <strong>${sect.name} · ${sect.weaponName}</strong><br/>
     ${sect.description}<br/>
     Sức mạnh ${sect.base.strength} · Tốc độ ${sect.base.speed} · Trí tuệ ${sect.base.intelligence}<br/>
-    Tuyệt kỹ: <strong>${sect.skill.name}</strong> — ${sect.skill.description}
+    Tầm đánh thường: <strong>${sect.attackRange}m</strong><br/>
+    Tuyệt kỹ: <strong>${sect.skill.name}</strong> (Tầm xa: ${sect.skill.range}m) — ${sect.skill.description}
   `;
 }
 
@@ -563,6 +564,8 @@ function updateSelfUI() {
   updateZoneLabel();
   $("skill-label").textContent = sect.skill.name;
   $("skill-icon").textContent = sect.skill.type === "MELEE" ? "拳" : sect.skill.type === "RANGED" ? "劍" : sect.skill.type === "HEAL" ? "佛" : "毒";
+  $("action-attack").title = `Đánh thường (Q / 1) - Tầm xa: ${sect.attackRange}m`;
+  $("action-skill").title = `Tuyệt kỹ: ${sect.skill.name} (W / 2) - Tầm xa: ${sect.skill.range}m`;
   $("pvp-toggle").textContent = `PvP: ${self.pvpEnabled ? "Bật" : "Tắt"}`;
   $("pvp-toggle").classList.toggle("btn-primary", self.pvpEnabled);
 }

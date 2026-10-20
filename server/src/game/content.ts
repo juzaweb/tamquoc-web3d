@@ -19,6 +19,7 @@ export interface SectDefinition {
   allowedGenders: Gender[];
   base: { strength: number; speed: number; intelligence: number };
   growth: { strength: number; speed: number; intelligence: number };
+  attackRange: number;
   skill: {
     id: string;
     name: string;
@@ -41,6 +42,7 @@ export const SECTS: Record<SectId, SectDefinition> = {
     allowedGenders: ["MALE"],
     base: { strength: 14, speed: 8, intelligence: 6 },
     growth: { strength: 3, speed: 1, intelligence: 1 },
+    attackRange: 3.5,
     skill: {
       id: "arhat_palm",
       name: "La Hán Chưởng",
@@ -61,6 +63,7 @@ export const SECTS: Record<SectId, SectDefinition> = {
     allowedGenders: ["MALE", "FEMALE"],
     base: { strength: 9, speed: 11, intelligence: 10 },
     growth: { strength: 2, speed: 2, intelligence: 2 },
+    attackRange: 18,
     skill: {
       id: "taiji_sword",
       name: "Thái Cực Kiếm Khí",
@@ -81,6 +84,7 @@ export const SECTS: Record<SectId, SectDefinition> = {
     allowedGenders: ["FEMALE"],
     base: { strength: 7, speed: 11, intelligence: 14 },
     growth: { strength: 1, speed: 2, intelligence: 3 },
+    attackRange: 10,
     skill: {
       id: "emei_palm",
       name: "Nga Mi Phật Quang",
@@ -101,6 +105,7 @@ export const SECTS: Record<SectId, SectDefinition> = {
     allowedGenders: ["MALE", "FEMALE"],
     base: { strength: 8, speed: 13, intelligence: 12 },
     growth: { strength: 2, speed: 3, intelligence: 2 },
+    attackRange: 4,
     skill: {
       id: "venom_palm",
       name: "Độc Chưởng",

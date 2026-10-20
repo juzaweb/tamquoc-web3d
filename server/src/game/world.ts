@@ -40,7 +40,7 @@ import type {
   WorldSnapshot,
 } from "./types.js";
 
-const BASIC_RANGE = 3.4;
+const DEFAULT_ATTACK_RANGE = 3.5;
 const BASIC_COOLDOWN_MS = 800;
 const CHAT_COOLDOWN_MS = 800;
 
@@ -462,10 +462,12 @@ export class GameWorld {
     attacker.lastAttackAt = now;
     attacker.lastCombatAt = now;
 
+    const attackRange = SECTS[attacker.sect]?.attackRange ?? DEFAULT_ATTACK_RANGE;
+
     if (targetType === "monster") {
       const monster = this.monsters.get(targetId);
       if (!monster || monster.dead) return this.error(socketId, "Mục tiêu không còn tồn tại.");
-      if (this.distance(attacker, monster) > BASIC_RANGE) return this.error(socketId, "Mục tiêu quá xa.");
+      if (this.distance(attacker, monster) > attackRange) return this.error(socketId, "Mục tiêu quá xa.");
       const { damage, crit } = rollDamage(attacker.stats.attack, monster.defense, 1);
       await this.damageMonster(attacker, monster, damage, false, 1, crit);
       return;
@@ -478,7 +480,7 @@ export class GameWorld {
     if (this.inSafeZone(attacker) || this.inSafeZone(target)) {
       return this.error(socketId, "Không thể giao chiến trong khu vực an toàn của thành.");
     }
-    if (this.distance(attacker, target) > BASIC_RANGE) return this.error(socketId, "Mục tiêu quá xa.");
+    if (this.distance(attacker, target) > attackRange) return this.error(socketId, "Mục tiêu quá xa.");
     const { damage, crit } = rollDamage(attacker.stats.attack, target.stats.defense, 1);
     this.damagePlayer(attacker, target, damage, false, crit);
   }
