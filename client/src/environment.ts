@@ -23,14 +23,15 @@ function grassTexture(): THREE.Texture {
   return texture;
 }
 
-export function buildEnvironment(scene: THREE.Scene, content: Content) {
+export function buildEnvironment(scene: THREE.Scene, content: Content, isTouchDevice: boolean) {
     const hemi = new THREE.HemisphereLight(0xbfd6ff, 0x2c291f, 1.1);
     scene.add(hemi);
 
     const sun = new THREE.DirectionalLight(0xffd7a1, 2.1);
     sun.position.set(45, 75, 25);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
+    const shadowMapSize = isTouchDevice ? 512 : 1024;
+    sun.shadow.mapSize.set(shadowMapSize, shadowMapSize);
     sun.shadow.camera.left = -80;
     sun.shadow.camera.right = 80;
     sun.shadow.camera.top = 80;
@@ -470,7 +471,7 @@ function banner(scene: THREE.Scene, x: number, z: number, color: number) {
   }
 
 function buildNature(scene: THREE.Scene, content: Content) {
-    const treePositions: [number, number, number][] = [];
+    const treePositions: { x: number; z: number; scale: number; foliage: number }[] = [];
     for (let i = 0; i < 140; i += 1) {
       const angle = Math.random() * Math.PI * 2;
       const radius = 22 + Math.random() * 115;
@@ -481,10 +482,54 @@ function buildNature(scene: THREE.Scene, content: Content) {
       const cityClear = content.world.wallHalf + 8;
       if (content.world.cities.some((city) => Math.abs(x - city.x) < cityClear && Math.abs(z - city.z) < cityClear)) continue;
       if (content.world.monsterZones.some((zone) => Math.hypot(x - zone.x, z - zone.z) < zone.radius + 3)) continue;
-      treePositions.push([x, z, 0.8 + Math.random() * 0.9]);
+      treePositions.push({
+        x,
+        z,
+        scale: 0.8 + Math.random() * 0.9,
+        foliage: Math.floor(Math.random() * 2),
+      });
     }
-    for (const [x, z, scale] of treePositions) tree(scene, x, z, scale);
+    const treeTransform = new THREE.Object3D();
+    if (treePositions.length > 0) {
+      const trunks = new THREE.InstancedMesh(
+        new THREE.CylinderGeometry(0.18, 0.28, 2.2, 6),
+        new THREE.MeshStandardMaterial({ color: 0x4a3524, roughness: 1 }),
+        treePositions.length,
+      );
+      trunks.castShadow = true;
+      treePositions.forEach(({ x, z, scale }, index) => {
+        treeTransform.position.set(x, 1.1 * scale, z);
+        treeTransform.scale.setScalar(scale);
+        treeTransform.updateMatrix();
+        trunks.setMatrixAt(index, treeTransform.matrix);
+      });
+      trunks.instanceMatrix.needsUpdate = true;
+      scene.add(trunks);
 
+      const leafColors = [0x2f5e37, 0x3b6b3a] as const;
+      const leafMaterials = leafColors.map(
+        (color) => new THREE.MeshStandardMaterial({ color, roughness: 1, flatShading: true }),
+      );
+      for (let tier = 0; tier < 3; tier += 1) {
+        const geometry = new THREE.ConeGeometry(1.5 - tier * 0.32, 1.7, 6);
+        for (let colorIndex = 0; colorIndex < leafColors.length; colorIndex += 1) {
+          const instances = treePositions.filter((tree) => tree.foliage === colorIndex);
+          if (instances.length === 0) continue;
+          const leaves = new THREE.InstancedMesh(geometry, leafMaterials[colorIndex]!, instances.length);
+          leaves.castShadow = true;
+          instances.forEach(({ x, z, scale }, index) => {
+            treeTransform.position.set(x, (2.2 + tier * 0.75) * scale, z);
+            treeTransform.scale.setScalar(scale);
+            treeTransform.updateMatrix();
+            leaves.setMatrixAt(index, treeTransform.matrix);
+          });
+          leaves.instanceMatrix.needsUpdate = true;
+          scene.add(leaves);
+        }
+      }
+    }
+
+    const rockPositions: { x: number; z: number; size: number; rotation: THREE.Euler }[] = [];
     for (let i = 0; i < 60; i += 1) {
       const angle = Math.random() * Math.PI * 2;
       const radius = 18 + Math.random() * 125;
@@ -493,54 +538,61 @@ function buildNature(scene: THREE.Scene, content: Content) {
       const cityClear = content.world.wallHalf + 4;
       if (content.world.cities.some((city) => Math.abs(x - city.x) < cityClear && Math.abs(z - city.z) < cityClear)) continue;
       if (content.world.monsterZones.some((zone) => Math.hypot(x - zone.x, z - zone.z) < zone.radius + 2)) continue;
-      const rock = new THREE.Mesh(
-        new THREE.DodecahedronGeometry(0.5 + Math.random() * 1.4),
+      rockPositions.push({
+        x,
+        z,
+        size: 0.5 + Math.random() * 1.4,
+        rotation: new THREE.Euler(Math.random(), Math.random(), Math.random()),
+      });
+    }
+    if (rockPositions.length > 0) {
+      const rocks = new THREE.InstancedMesh(
+        new THREE.DodecahedronGeometry(1),
         new THREE.MeshStandardMaterial({ color: 0x5b5f63, roughness: 1, flatShading: true }),
+        rockPositions.length,
       );
-      rock.position.set(x, 0.25, z);
-      rock.rotation.set(Math.random(), Math.random(), Math.random());
-      rock.castShadow = true;
-      rock.receiveShadow = true;
-      scene.add(rock);
+      rocks.castShadow = true;
+      rocks.receiveShadow = true;
+      rockPositions.forEach(({ x, z, size, rotation }, index) => {
+        treeTransform.position.set(x, 0.25, z);
+        treeTransform.rotation.copy(rotation);
+        treeTransform.scale.setScalar(size);
+        treeTransform.updateMatrix();
+        rocks.setMatrixAt(index, treeTransform.matrix);
+      });
+      rocks.instanceMatrix.needsUpdate = true;
+      scene.add(rocks);
     }
 
+    const mountains: { x: number; z: number; radius: number; height: number; rotation: number }[] = [];
     for (let i = 0; i < 26; i += 1) {
       const angle = (i / 26) * Math.PI * 2 + Math.random() * 0.1;
       const radius = 165 + Math.random() * 70;
       const height = 28 + Math.random() * 46;
-      const mountain = new THREE.Mesh(
-        new THREE.ConeGeometry(16 + Math.random() * 20, height, 5),
+      mountains.push({
+        x: Math.cos(angle) * radius,
+        z: Math.sin(angle) * radius,
+        radius: 16 + Math.random() * 20,
+        height,
+        rotation: Math.random() * Math.PI,
+      });
+    }
+    if (mountains.length > 0) {
+      const mountainMesh = new THREE.InstancedMesh(
+        new THREE.ConeGeometry(1, 1, 5),
         new THREE.MeshStandardMaterial({ color: 0x1b2833, roughness: 1, flatShading: true }),
+        mountains.length,
       );
-      mountain.position.set(Math.cos(angle) * radius, height / 2 - 4, Math.sin(angle) * radius);
-      mountain.rotation.y = Math.random() * Math.PI;
-      scene.add(mountain);
+      mountains.forEach(({ x, z, radius, height, rotation }, index) => {
+        treeTransform.position.set(x, height / 2 - 4, z);
+        treeTransform.rotation.set(0, rotation, 0);
+        treeTransform.scale.set(radius, height, radius);
+        treeTransform.updateMatrix();
+        mountainMesh.setMatrixAt(index, treeTransform.matrix);
+      });
+      mountainMesh.instanceMatrix.needsUpdate = true;
+      scene.add(mountainMesh);
     }
-  }
-
-function tree(scene: THREE.Scene, x: number, z: number, scale: number) {
-    const group = new THREE.Group();
-    const trunk = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.18, 0.28, 2.2, 6),
-      new THREE.MeshStandardMaterial({ color: 0x4a3524, roughness: 1 }),
-    );
-    trunk.position.y = 1.1;
-    trunk.castShadow = true;
-    group.add(trunk);
-    const leafMaterial = new THREE.MeshStandardMaterial({
-      color: Math.random() > 0.5 ? 0x2f5e37 : 0x3b6b3a,
-      roughness: 1,
-      flatShading: true,
-    });
-    for (let i = 0; i < 3; i += 1) {
-      const leaves = new THREE.Mesh(new THREE.ConeGeometry(1.5 - i * 0.32, 1.7, 6), leafMaterial);
-      leaves.position.y = 2.2 + i * 0.75;
-      leaves.castShadow = true;
-      group.add(leaves);
-    }
-    group.position.set(x, 0, z);
-    group.scale.setScalar(scale);
-    scene.add(group);
   }
 
 function polarityTorch(scene: THREE.Scene, pole: THREE.Mesh, x: number, z: number) {

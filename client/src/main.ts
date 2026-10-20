@@ -35,6 +35,8 @@ let skillCooldownsAt: Record<string, number> = { Q: 0, W: 0, E: 0, R: 0 };
 let potionReadyAt = 0;
 let lastMoveSentAt = 0;
 let lastFrameAt = performance.now();
+let lastCooldownUpdateAt = 0;
+let lastNpcPromptUpdateAt = 0;
 let deathTimer: ReturnType<typeof setInterval> | null = null;
 let enteringGame = false;
 let suppressDisconnectNotice = false;
@@ -1297,8 +1299,14 @@ function movementLoop() {
   const now = performance.now();
   const dt = Math.min(0.1, (now - lastFrameAt) / 1000);
   lastFrameAt = now;
-  updateCooldowns(now);
-  updateNpcPrompt();
+  if (now - lastCooldownUpdateAt >= 100) {
+    lastCooldownUpdateAt = now;
+    updateCooldowns(now);
+  }
+  if (now - lastNpcPromptUpdateAt >= 150) {
+    lastNpcPromptUpdateAt = now;
+    updateNpcPrompt();
+  }
   if (currentScreen !== "game" || !game || !self || self.dead || !net.connected) {
     clickTargetPosition = null;
     return;

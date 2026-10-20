@@ -123,7 +123,10 @@ export class GameClient {
   private dragMoved = 0;
   private animationFrame = 0;
   private disposed = false;
+  private lastShadowUpdateAt = 0;
   private readonly cameraTarget = new THREE.Vector3();
+  private readonly cameraOffset = new THREE.Vector3();
+  private readonly cameraDesired = new THREE.Vector3();
   private readonly resizeHandler = () => this.resize();
 
   constructor(
@@ -137,17 +140,20 @@ export class GameClient {
     this.content = content;
     this.onSelect = onSelect;
     this.onGroundClick = onGroundClick;
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: !isTouchDevice });
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, isTouchDevice ? 1 : 1.5));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.autoUpdate = false;
+    this.renderer.shadowMap.needsUpdate = true;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
     this.camera = new THREE.PerspectiveCamera(55, 1, 0.1, 500);
     this.scene.background = new THREE.Color(0x0b1620);
     this.scene.fog = new THREE.FogExp2(0x0b1620, 0.007);
 
-    buildEnvironment(this.scene, this.content);
+    buildEnvironment(this.scene, this.content, isTouchDevice);
 
     this.selectionRing = new THREE.Mesh(
       new THREE.RingGeometry(0.75, 0.95, 36),
@@ -876,43 +882,40 @@ export class GameClient {
   }
 
   private spawnDustPuff(pos: THREE.Vector3, rotationY: number) {
-    const count = 1 + Math.floor(Math.random() * 2);
-    for (let i = 0; i < count; i += 1) {
-      const size = 0.18 + Math.random() * 0.16;
-      const geo = new THREE.DodecahedronGeometry(size, 0);
-      const mat = new THREE.MeshBasicMaterial({
-        color: 0xd2c29d,
-        transparent: true,
-        opacity: 0.55,
-      });
-      const mesh = new THREE.Mesh(geo, mat);
-      const backAngle = rotationY + Math.PI + (Math.random() - 0.5) * 0.8;
-      const dist = 0.2 + Math.random() * 0.35;
-      mesh.position.set(
-        pos.x + Math.sin(backAngle) * dist,
-        0.08 + Math.random() * 0.08,
-        pos.z + Math.cos(backAngle) * dist,
-      );
-      mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
-      this.scene.add(mesh);
+    const size = 0.18 + Math.random() * 0.16;
+    const geo = new THREE.DodecahedronGeometry(size, 0);
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0xd2c29d,
+      transparent: true,
+      opacity: 0.55,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    const backAngle = rotationY + Math.PI + (Math.random() - 0.5) * 0.8;
+    const dist = 0.2 + Math.random() * 0.35;
+    mesh.position.set(
+      pos.x + Math.sin(backAngle) * dist,
+      0.08 + Math.random() * 0.08,
+      pos.z + Math.cos(backAngle) * dist,
+    );
+    mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
+    this.scene.add(mesh);
 
-      const vx = (Math.random() - 0.5) * 0.5;
-      const vz = (Math.random() - 0.5) * 0.5;
-      const vy = 0.4 + Math.random() * 0.4;
+    const vx = (Math.random() - 0.5) * 0.5;
+    const vz = (Math.random() - 0.5) * 0.5;
+    const vy = 0.4 + Math.random() * 0.4;
 
-      this.effects.push({
-        object: mesh,
-        life: 0,
-        maxLife: 0.4 + Math.random() * 0.25,
-        update: (dt, progress) => {
-          mesh.position.x += vx * dt;
-          mesh.position.y += vy * dt;
-          mesh.position.z += vz * dt;
-          mesh.scale.setScalar(1 + progress * 2.2);
-          mat.opacity = Math.max(0, 0.55 * (1 - progress));
-        },
-      });
-    }
+    this.effects.push({
+      object: mesh,
+      life: 0,
+      maxLife: 0.4 + Math.random() * 0.25,
+      update: (dt, progress) => {
+        mesh.position.x += vx * dt;
+        mesh.position.y += vy * dt;
+        mesh.position.z += vz * dt;
+        mesh.scale.setScalar(1 + progress * 2.2);
+        mat.opacity = Math.max(0, 0.55 * (1 - progress));
+      },
+    });
   }
 
   private spawnShaolinPalmSkill(
@@ -1166,10 +1169,15 @@ export class GameClient {
   private loop = () => {
     if (this.disposed) return;
     this.animationFrame = requestAnimationFrame(this.loop);
+    const now = performance.now();
     const dt = Math.min(this.clock.getDelta(), 0.1);
     this.updateEntities(dt);
     this.updateCamera(dt);
     this.updateEffects(dt);
+    if (now - this.lastShadowUpdateAt >= 125) {
+      this.lastShadowUpdateAt = now;
+      this.renderer.shadowMap.needsUpdate = true;
+    }
     this.renderer.render(this.scene, this.camera);
   };
 
@@ -1191,7 +1199,7 @@ export class GameClient {
         group.rotation.y += diff * Math.min(1, dt * 10);
         entity.walkTime += dt;
 
-        if (!entity.lastDustTime || nowSec - entity.lastDustTime > 0.09) {
+        if (!entity.lastDustTime || nowSec - entity.lastDustTime > 0.18) {
           entity.lastDustTime = nowSec;
           this.spawnDustPuff(group.position, group.rotation.y);
         }
@@ -1216,18 +1224,18 @@ export class GameClient {
     const local = this.localId ? this.entities.get(this.localId) : null;
     if (local) {
       this.cameraTarget.lerp(
-        new THREE.Vector3(local.group.position.x, local.group.position.y + 1.35, local.group.position.z),
+        this.cameraOffset.set(local.group.position.x, local.group.position.y + 1.35, local.group.position.z),
         1 - Math.exp(-dt * 8),
       );
     }
     const horizontal = Math.cos(this.pitch) * this.distance;
-    const offset = new THREE.Vector3(
+    this.cameraOffset.set(
       Math.sin(this.yaw) * horizontal,
       Math.sin(this.pitch) * this.distance,
       Math.cos(this.yaw) * horizontal,
     );
-    const desired = this.cameraTarget.clone().add(offset);
-    this.camera.position.lerp(desired, 1 - Math.exp(-dt * 10));
+    this.cameraDesired.copy(this.cameraTarget).add(this.cameraOffset);
+    this.camera.position.lerp(this.cameraDesired, 1 - Math.exp(-dt * 10));
     this.camera.lookAt(this.cameraTarget);
   }
 
