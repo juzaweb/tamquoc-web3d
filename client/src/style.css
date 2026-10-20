@@ -22,10 +22,15 @@ html,
 body {
   margin: 0;
   height: 100%;
+  width: 100%;
   overflow: hidden;
   background: var(--ink);
   color: var(--text);
   font-family: "Iowan Old Style", "Palatino Linotype", "Noto Serif", Georgia, serif;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
 }
 
 button,
@@ -1224,6 +1229,72 @@ input[type="color"] {
   pointer-events: none;
 }
 
+/* Orientation Lock Overlay for Mobile */
+.orientation-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: rgba(5, 7, 10, 0.96);
+  backdrop-filter: blur(12px);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  text-align: center;
+}
+
+.orientation-card {
+  max-width: 320px;
+  padding: 28px 24px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel-solid);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.orientation-icon {
+  font-size: 54px;
+  animation: rotate-phone 2s infinite ease-in-out;
+  color: var(--gold-bright);
+}
+
+@keyframes rotate-phone {
+  0%, 10% {
+    transform: rotate(0deg);
+  }
+  40%, 60% {
+    transform: rotate(-90deg);
+  }
+  90%, 100% {
+    transform: rotate(0deg);
+  }
+}
+
+.orientation-card h2 {
+  margin: 0;
+  font-size: 16px;
+  color: var(--gold-bright);
+  letter-spacing: 0.08em;
+  line-height: 1.4;
+}
+
+.orientation-card p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+/* Force show overlay on mobile devices in portrait mode */
+@media screen and (orientation: portrait) and (max-width: 1024px) {
+  .orientation-overlay {
+    display: grid !important;
+  }
+}
+
 @media (max-width: 900px) {
   .auth-screen {
     grid-template-columns: 1fr;
@@ -1259,5 +1330,138 @@ input[type="color"] {
 
   .portrait-badge {
     display: none;
+  }
+}
+
+/* Mobile Landscape Optimizations (low height screens) */
+@media (max-height: 500px) and (orientation: landscape) {
+  .hud-top-left {
+    top: 8px;
+    left: env(safe-area-inset-left, 8px);
+    gap: 6px;
+  }
+
+  .self-panel {
+    min-width: 180px;
+    padding: 6px 8px;
+  }
+
+  .self-name-row {
+    margin-bottom: 3px;
+    font-size: 11px;
+  }
+
+  .bar {
+    height: 10px;
+    margin-bottom: 3px;
+  }
+
+  .xp-bar {
+    height: 6px;
+  }
+
+  .self-meta {
+    font-size: 9px;
+  }
+
+  .zone-line {
+    margin-top: 3px;
+  }
+
+  .zone-line .chip {
+    font-size: 9px;
+    padding: 1px 6px;
+  }
+
+  .hud-top-right {
+    top: 8px;
+    right: env(safe-area-inset-right, 8px);
+    gap: 4px;
+    max-width: 55vw;
+  }
+
+  .hud-top-right .chip,
+  .hud-top-right .btn {
+    padding: 3px 8px;
+    font-size: 11px;
+  }
+
+  .target-frame {
+    top: 48px;
+    width: min(260px, 35vw);
+    padding: 6px 10px;
+  }
+
+  .action-bar {
+    bottom: env(safe-area-inset-bottom, 8px);
+    gap: 6px;
+  }
+
+  .action-slot {
+    width: 52px;
+    height: 52px;
+    border-radius: 8px;
+  }
+
+  .action-icon {
+    font-size: 18px;
+  }
+
+  .action-label {
+    font-size: 8px;
+  }
+
+  .action-key {
+    font-size: 9px;
+    top: 2px;
+    left: 4px;
+  }
+
+  .hud-bottom-left {
+    left: env(safe-area-inset-left, 8px);
+    bottom: env(safe-area-inset-bottom, 8px);
+    width: min(240px, 32vw);
+  }
+
+  .chat-log {
+    height: 90px;
+    font-size: 11px;
+    padding: 6px 8px;
+  }
+
+  .chat-form select,
+  .chat-form input {
+    font-size: 11px;
+    padding: 6px 8px;
+  }
+
+  .side-panel {
+    top: 48px;
+    right: env(safe-area-inset-right, 8px);
+    width: min(320px, 45vw);
+    max-height: calc(100vh - 60px);
+  }
+
+  .npc-prompt {
+    bottom: 66px;
+    padding: 6px 14px;
+    font-size: 11px;
+  }
+
+  .character-screen {
+    padding: 12px 16px;
+  }
+
+  .character-header {
+    margin-bottom: 12px;
+  }
+
+  .character-layout {
+    gap: 12px;
+  }
+
+  .create-card {
+    padding: 12px;
+    gap: 10px;
   }
 }
