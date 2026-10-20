@@ -51,6 +51,10 @@ export interface RuntimePlayer {
   lastMoveAt: number;
   lastAttackAt: number;
   lastSkillAt: number;
+  skillCooldowns: Record<string, number>;
+  stunnedUntil: number;
+  buffUntil: number;
+  buffDefense: number;
   lastCombatAt: number;
   lastChatAt: number;
   dirty: boolean;
@@ -89,6 +93,8 @@ export interface RuntimeMonster {
   poisonDamage: number;
   poisonTickAt: number;
   poisonSourceId: string | null;
+  stunnedUntil: number;
+  slowUntil: number;
 }
 
 export interface PlayerSnapshot {
@@ -109,6 +115,7 @@ export interface PlayerSnapshot {
   rotation: number;
   pvpEnabled: boolean;
   dead: boolean;
+  stunnedUntil?: number;
 }
 
 export interface MonsterSnapshot {
@@ -124,6 +131,7 @@ export interface MonsterSnapshot {
   rotation: number;
   isBoss: boolean;
   dead: boolean;
+  stunnedUntil?: number;
 }
 
 export interface WorldSnapshot {

@@ -610,7 +610,12 @@ export class GameClient {
       entity.sect = player.sect;
       entity.faction = player.faction;
       entity.group.visible = !player.dead;
-      this.updateLabel(entity, player.name, player.hp / Math.max(1, player.maxHp), factionHex(player.faction));
+      this.updateLabel(
+        entity,
+        player.stunnedUntil && player.stunnedUntil > state.serverTime ? `[Choáng] ${player.name}` : player.name,
+        player.hp / Math.max(1, player.maxHp),
+        factionHex(player.faction),
+      );
     }
 
     for (const monster of state.monsters) {
@@ -628,7 +633,7 @@ export class GameClient {
       entity.group.visible = !monster.dead;
       this.updateLabel(
         entity,
-        monster.name,
+        monster.stunnedUntil && monster.stunnedUntil > state.serverTime ? `[Choáng] ${monster.name}` : monster.name,
         monster.hp / Math.max(1, monster.maxHp),
         monster.isBoss ? "#ffb36b" : "#f1e6cc",
       );

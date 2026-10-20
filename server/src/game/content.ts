@@ -9,7 +9,23 @@ export const CITY_WALL_HALF = 24;
 export const CITY_GATE_HALF = 4;
 export const GATE_PK_INNER_RADIUS = 24.5;
 export type Gender = "MALE" | "FEMALE";
-export type SkillType = "MELEE" | "RANGED" | "HEAL" | "POISON";
+export type SkillType = "MELEE" | "RANGED" | "HEAL" | "POISON" | "DASH" | "STUN" | "BUFF";
+export type SkillSlot = "Q" | "W" | "E" | "R";
+
+export interface SkillDefinition {
+  id: string;
+  slot: SkillSlot;
+  name: string;
+  description: string;
+  type: SkillType;
+  mpCost: number;
+  cooldownMs: number;
+  power: number;
+  range: number;
+  color: number;
+  stunMs?: number;
+  dashDistance?: number;
+}
 
 export interface SectDefinition {
   id: SectId;
@@ -20,17 +36,7 @@ export interface SectDefinition {
   base: { strength: number; speed: number; intelligence: number };
   growth: { strength: number; speed: number; intelligence: number };
   attackRange: number;
-  skill: {
-    id: string;
-    name: string;
-    description: string;
-    type: SkillType;
-    mpCost: number;
-    cooldownMs: number;
-    power: number;
-    range: number;
-    color: number;
-  };
+  skills: Record<SkillSlot, SkillDefinition>;
 }
 
 export const SECTS: Record<SectId, SectDefinition> = {
@@ -43,16 +49,58 @@ export const SECTS: Record<SectId, SectDefinition> = {
     base: { strength: 14, speed: 8, intelligence: 6 },
     growth: { strength: 3, speed: 1, intelligence: 1 },
     attackRange: 3.5,
-    skill: {
-      id: "arhat_palm",
-      name: "La Hán Chưởng",
-      description: "Chưởng lực đánh trúng mọi kẻ địch quanh bản thân.",
-      type: "MELEE",
-      mpCost: 12,
-      cooldownMs: 3000,
-      power: 1.8,
-      range: 6,
-      color: 0xffb347,
+    skills: {
+      Q: {
+        id: "shaolin_q",
+        slot: "Q",
+        name: "La Hán Chưởng",
+        description: "Chưởng lực cương mãnh đánh trúng mọi kẻ địch xung quanh.",
+        type: "MELEE",
+        mpCost: 12,
+        cooldownMs: 3000,
+        power: 1.8,
+        range: 6,
+        color: 0xffb347,
+      },
+      W: {
+        id: "shaolin_w",
+        slot: "W",
+        name: "Sư Tử Hống",
+        description: "Phát ra tiếng hú chấn động gây sát thương và làm choáng kẻ địch 1.2s.",
+        type: "STUN",
+        mpCost: 20,
+        cooldownMs: 8000,
+        power: 1.2,
+        range: 8,
+        color: 0xffd700,
+        stunMs: 1200,
+      },
+      E: {
+        id: "shaolin_e",
+        slot: "E",
+        name: "Ma Ha Vô Lượng",
+        description: "Lướt nhanh đến mục tiêu, gây sát thương và làm choáng 1.2s.",
+        type: "DASH",
+        mpCost: 22,
+        cooldownMs: 10000,
+        power: 1.6,
+        range: 14,
+        color: 0xffa500,
+        stunMs: 1200,
+        dashDistance: 14,
+      },
+      R: {
+        id: "shaolin_r",
+        slot: "R",
+        name: "Kim Cang Bất Hoại",
+        description: "Vận công hồi 25% tối đa sinh lực và tăng mạnh phòng thủ trong 6s.",
+        type: "BUFF",
+        mpCost: 35,
+        cooldownMs: 20000,
+        power: 2.0,
+        range: 0,
+        color: 0xffff00,
+      },
     },
   },
   WUDANG: {
@@ -64,16 +112,57 @@ export const SECTS: Record<SectId, SectDefinition> = {
     base: { strength: 9, speed: 11, intelligence: 10 },
     growth: { strength: 2, speed: 2, intelligence: 2 },
     attackRange: 18,
-    skill: {
-      id: "taiji_sword",
-      name: "Thái Cực Kiếm Khí",
-      description: "Phóng kiếm khí xuyên qua kẻ địch ở xa.",
-      type: "RANGED",
-      mpCost: 15,
-      cooldownMs: 3500,
-      power: 1.7,
-      range: 22,
-      color: 0x7fd4ff,
+    skills: {
+      Q: {
+        id: "wudang_q",
+        slot: "Q",
+        name: "Thái Cực Kiếm Khí",
+        description: "Phóng kiếm khí xuyên qua kẻ địch ở xa.",
+        type: "RANGED",
+        mpCost: 15,
+        cooldownMs: 3500,
+        power: 1.7,
+        range: 22,
+        color: 0x7fd4ff,
+      },
+      W: {
+        id: "wudang_w",
+        slot: "W",
+        name: "Bát Quái Trận",
+        description: "Tạo Bát Quái Trận tại mục tiêu gây sát thương và làm choáng 1.2s.",
+        type: "STUN",
+        mpCost: 22,
+        cooldownMs: 8000,
+        power: 1.5,
+        range: 16,
+        color: 0x00e5ff,
+        stunMs: 1200,
+      },
+      E: {
+        id: "wudang_e",
+        slot: "E",
+        name: "Thê Vân Túng",
+        description: "Lướt nhanh tiến về phía mục tiêu, chém kiếm khí cực nhanh.",
+        type: "DASH",
+        mpCost: 18,
+        cooldownMs: 8000,
+        power: 1.4,
+        range: 15,
+        color: 0x80efff,
+        dashDistance: 15,
+      },
+      R: {
+        id: "wudang_r",
+        slot: "R",
+        name: "Kiếm Khí Xung Thiên",
+        description: "Ngưng tụ vạn đạo kiếm khí bùng nổ gây sát thương lớn diện rộng.",
+        type: "RANGED",
+        mpCost: 38,
+        cooldownMs: 18000,
+        power: 2.5,
+        range: 20,
+        color: 0x33ffff,
+      },
     },
   },
   EMEI: {
@@ -85,16 +174,56 @@ export const SECTS: Record<SectId, SectDefinition> = {
     base: { strength: 7, speed: 11, intelligence: 14 },
     growth: { strength: 1, speed: 2, intelligence: 3 },
     attackRange: 10,
-    skill: {
-      id: "emei_palm",
-      name: "Nga Mi Phật Quang",
-      description: "Gây sát thương và hồi máu cho bản thân.",
-      type: "HEAL",
-      mpCost: 18,
-      cooldownMs: 4500,
-      power: 1.4,
-      range: 12,
-      color: 0xff9de2,
+    skills: {
+      Q: {
+        id: "emei_q",
+        slot: "Q",
+        name: "Nga Mi Phật Quang",
+        description: "Chưởng lực Phật Quang gây sát thương và hồi máu cho bản thân.",
+        type: "HEAL",
+        mpCost: 18,
+        cooldownMs: 4500,
+        power: 1.4,
+        range: 12,
+        color: 0xff9de2,
+      },
+      W: {
+        id: "emei_w",
+        slot: "W",
+        name: "Băng Phong Tuyết Vũ",
+        description: "Phóng băng tuyết gây sát thương xa và làm chậm kẻ địch.",
+        type: "RANGED",
+        mpCost: 20,
+        cooldownMs: 6000,
+        power: 1.6,
+        range: 18,
+        color: 0x80d8ff,
+      },
+      E: {
+        id: "emei_e",
+        slot: "E",
+        name: "Thanh Âm Tẩy Tủy",
+        description: "Thiền âm hóa giải trạng thái bất lợi và hồi 35% sinh lực.",
+        type: "HEAL",
+        mpCost: 30,
+        cooldownMs: 12000,
+        power: 2.2,
+        range: 12,
+        color: 0xffb74d,
+      },
+      R: {
+        id: "emei_r",
+        slot: "R",
+        name: "Vô Lượng Phật Pháp",
+        description: "Triệu hồi phật quang vạn trượng gây sát thương diện rộng và làm choáng 1.2s.",
+        type: "STUN",
+        mpCost: 40,
+        cooldownMs: 18000,
+        power: 2.4,
+        range: 14,
+        color: 0xffea78,
+        stunMs: 1200,
+      },
     },
   },
   WUDU: {
@@ -106,16 +235,57 @@ export const SECTS: Record<SectId, SectDefinition> = {
     base: { strength: 8, speed: 13, intelligence: 12 },
     growth: { strength: 2, speed: 3, intelligence: 2 },
     attackRange: 4,
-    skill: {
-      id: "venom_palm",
-      name: "Độc Chưởng",
-      description: "Tẩm độc vào đòn đánh, thiêu đốt sinh lực kẻ địch.",
-      type: "POISON",
-      mpCost: 14,
-      cooldownMs: 4000,
-      power: 1.1,
-      range: 5,
-      color: 0x9cff6b,
+    skills: {
+      Q: {
+        id: "wudu_q",
+        slot: "Q",
+        name: "Độc Chưởng",
+        description: "Tẩm độc vào đòn đánh, thiêu đốt sinh lực kẻ địch liên tục.",
+        type: "POISON",
+        mpCost: 14,
+        cooldownMs: 4000,
+        power: 1.1,
+        range: 5,
+        color: 0x9cff6b,
+      },
+      W: {
+        id: "wudu_w",
+        slot: "W",
+        name: "Vạn Độc Trận",
+        description: "Phủ độc sương bùng nổ gây độc diện rộng.",
+        type: "POISON",
+        mpCost: 22,
+        cooldownMs: 8000,
+        power: 1.5,
+        range: 12,
+        color: 0x00ff66,
+      },
+      E: {
+        id: "wudu_e",
+        slot: "E",
+        name: "U Độc Bộ",
+        description: "Lướt nhanh để lại vệt độc, gây sát thương và làm choáng kẻ địch 1.2s.",
+        type: "DASH",
+        mpCost: 20,
+        cooldownMs: 9000,
+        power: 1.4,
+        range: 12,
+        color: 0x33ff99,
+        stunMs: 1200,
+        dashDistance: 12,
+      },
+      R: {
+        id: "wudu_r",
+        slot: "R",
+        name: "Cuồng Độc Bão Táp",
+        description: "Bão độc kinh thiên động địa rút sinh lực địch trong nháy mắt.",
+        type: "POISON",
+        mpCost: 38,
+        cooldownMs: 18000,
+        power: 2.6,
+        range: 12,
+        color: 0x00e640,
+      },
     },
   },
 };

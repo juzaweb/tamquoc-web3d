@@ -186,25 +186,37 @@
         </div>
 
         <div class="action-bar">
-          <button class="action-slot" id="action-attack" title="Đòn thường (Q)">
+          <button class="action-slot" id="action-skill-q" title="Kỹ năng Q">
             <span class="action-key">Q</span>
-            <span class="action-icon">拳</span>
-            <span class="action-label">Công</span>
-            <span class="cooldown" id="cd-attack"></span>
+            <span class="action-icon" id="skill-q-icon">Q</span>
+            <span class="action-label" id="skill-q-label">Skill Q</span>
+            <span class="cooldown" id="cd-skill-q"></span>
           </button>
-          <button class="action-slot" id="action-skill" title="Tuyệt kỹ (W)">
+          <button class="action-slot" id="action-skill-w" title="Kỹ năng W">
             <span class="action-key">W</span>
-            <span class="action-icon" id="skill-icon">技</span>
-            <span class="action-label" id="skill-label">Tuyệt kỹ</span>
-            <span class="cooldown" id="cd-skill"></span>
+            <span class="action-icon" id="skill-w-icon">W</span>
+            <span class="action-label" id="skill-w-label">Skill W</span>
+            <span class="cooldown" id="cd-skill-w"></span>
           </button>
-          <button class="action-slot" id="action-potion-hp" title="Hồi Huyết Đan (A)">
-            <span class="action-key">A</span>
+          <button class="action-slot" id="action-skill-e" title="Kỹ năng E">
+            <span class="action-key">E</span>
+            <span class="action-icon" id="skill-e-icon">E</span>
+            <span class="action-label" id="skill-e-label">Skill E</span>
+            <span class="cooldown" id="cd-skill-e"></span>
+          </button>
+          <button class="action-slot" id="action-skill-r" title="Kỹ năng R">
+            <span class="action-key">R</span>
+            <span class="action-icon" id="skill-r-icon">R</span>
+            <span class="action-label" id="skill-r-label">Skill R</span>
+            <span class="cooldown" id="cd-skill-r"></span>
+          </button>
+          <button class="action-slot" id="action-potion-hp" title="Hồi Huyết Đan (phím 1)">
+            <span class="action-key">1</span>
             <span class="action-icon red">丹</span>
             <span class="action-label">Hồi HP</span>
           </button>
-          <button class="action-slot" id="action-potion-mp" title="Hồi Khí Đan (S)">
-            <span class="action-key">S</span>
+          <button class="action-slot" id="action-potion-mp" title="Hồi Khí Đan (phím 2)">
+            <span class="action-key">2</span>
             <span class="action-icon blue">氣</span>
             <span class="action-label">Hồi MP</span>
           </button>
@@ -213,8 +225,8 @@
         <div class="controls-hint">
           <span>Click chuột trái di chuyển / chọn mục tiêu</span>
           <span>Kéo chuột trái xoay camera</span>
-          <span>Q đánh · W tuyệt kỹ</span>
-          <span>A hồi huyết · S hồi khí · F cửa hàng</span>
+          <span>Q / W / E / R thi triển kỹ năng</span>
+          <span>1 hồi huyết · 2 hồi khí · F cửa hàng</span>
         </div>
 
         <div id="reconnect-banner" class="reconnect-banner hidden">Đang kết nối lại...</div>

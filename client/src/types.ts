@@ -2,6 +2,24 @@ export type SectId = "SHAOLIN" | "WUDANG" | "EMEI" | "WUDU";
 export type FactionId = "HAN" | "SHU" | "WEI";
 export type Gender = "MALE" | "FEMALE";
 
+export type SkillType = "MELEE" | "RANGED" | "HEAL" | "POISON" | "DASH" | "STUN" | "BUFF";
+export type SkillSlot = "Q" | "W" | "E" | "R";
+
+export interface SkillDefinition {
+  id: string;
+  slot: SkillSlot;
+  name: string;
+  description: string;
+  type: SkillType;
+  mpCost: number;
+  cooldownMs: number;
+  power: number;
+  range: number;
+  color: number;
+  stunMs?: number;
+  dashDistance?: number;
+}
+
 export interface SectDefinition {
   id: SectId;
   name: string;
@@ -11,17 +29,7 @@ export interface SectDefinition {
   base: { strength: number; speed: number; intelligence: number };
   growth: { strength: number; speed: number; intelligence: number };
   attackRange: number;
-  skill: {
-    id: string;
-    name: string;
-    description: string;
-    type: "MELEE" | "RANGED" | "HEAL" | "POISON";
-    mpCost: number;
-    cooldownMs: number;
-    power: number;
-    range: number;
-    color: number;
-  };
+  skills: Record<SkillSlot, SkillDefinition>;
 }
 
 export interface ItemTemplate {
@@ -184,6 +192,7 @@ export interface PlayerSnapshot {
   rotation: number;
   pvpEnabled: boolean;
   dead: boolean;
+  stunnedUntil?: number;
   appearance?: { color?: string; hair?: string; height?: number };
 }
 
@@ -200,6 +209,7 @@ export interface MonsterSnapshot {
   rotation: number;
   isBoss: boolean;
   dead: boolean;
+  stunnedUntil?: number;
 }
 
 export interface WorldState {

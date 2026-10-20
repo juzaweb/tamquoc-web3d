@@ -30,8 +30,7 @@ let worldState: WorldState | null = null;
 let game: GameClient | null = null;
 let target: { id: string; kind: "monster" | "player" } | null = null;
 let currentScreen: "auth" | "characters" | "game" = "auth";
-let attackReadyAt = 0;
-let skillReadyAt = 0;
+let skillCooldownsAt: Record<string, number> = { Q: 0, W: 0, E: 0, R: 0 };
 let potionReadyAt = 0;
 let lastMoveSentAt = 0;
 let lastFrameAt = performance.now();
@@ -248,7 +247,7 @@ function renderCreateOptions() {
     button.type = "button";
     button.className = `option${sect.id === selectedSect ? " active" : ""}`;
     button.dataset.sect = sect.id;
-    button.innerHTML = `<strong>${sect.name}</strong><small>${sect.weaponName} · ${sect.skill.name}</small>`;
+    button.innerHTML = `<strong>${sect.name}</strong><small>${sect.weaponName} · ${sect.skills.Q.name}</small>`;
     button.addEventListener("click", () => {
       selectedSect = sect.id;
       if (!sect.allowedGenders.includes(selectedGender)) selectedGender = sect.allowedGenders[0] ?? "MALE";
@@ -291,7 +290,10 @@ function renderCreateOptions() {
     ${sect.description}<br/>
     Sức mạnh ${sect.base.strength} · Tốc độ ${sect.base.speed} · Trí tuệ ${sect.base.intelligence}<br/>
     Tầm đánh thường: <strong>${sect.attackRange}m</strong><br/>
-    Tuyệt kỹ: <strong>${sect.skill.name}</strong> (Tầm xa: ${sect.skill.range}m) — ${sect.skill.description}
+    Kỹ năng: <strong>Q: ${sect.skills.Q.name}</strong> (${sect.skills.Q.range}m) |
+    <strong>W: ${sect.skills.W.name}</strong> (${sect.skills.W.range}m) |
+    <strong>E: ${sect.skills.E.name}</strong> (${sect.skills.E.range}m) |
+    <strong>R: ${sect.skills.R.name}</strong> (${sect.skills.R.range}m)
   `;
 }
 
@@ -562,10 +564,15 @@ function updateSelfUI() {
   $("self-gold").textContent = `${self.gold.toLocaleString("vi-VN")} vàng`;
   $("self-stats").textContent = `Lực ${self.stats.strength} · Tốc ${self.stats.speed} · Trí ${self.stats.intelligence}`;
   updateZoneLabel();
-  $("skill-label").textContent = sect.skill.name;
-  $("skill-icon").textContent = sect.skill.type === "MELEE" ? "拳" : sect.skill.type === "RANGED" ? "劍" : sect.skill.type === "HEAL" ? "佛" : "毒";
-  $("action-attack").title = `Đánh thường (Q / 1) - Tầm xa: ${sect.attackRange}m`;
-  $("action-skill").title = `Tuyệt kỹ: ${sect.skill.name} (W / 2) - Tầm xa: ${sect.skill.range}m`;
+  const slots: ("Q" | "W" | "E" | "R")[] = ["Q", "W", "E", "R"];
+  for (const slot of slots) {
+    const sk = sect.skills[slot];
+    if (sk) {
+      $(`skill-${slot.toLowerCase()}-label`).textContent = sk.name;
+      $(`skill-${slot.toLowerCase()}-icon`).textContent = slot;
+      $(`action-skill-${slot.toLowerCase()}`).title = `${sk.name} (${slot})\n${sk.description}`;
+    }
+  }
   $("pvp-toggle").textContent = `PvP: ${self.pvpEnabled ? "Bật" : "Tắt"}`;
   $("pvp-toggle").classList.toggle("btn-primary", self.pvpEnabled);
 }
@@ -870,23 +877,14 @@ function updateNpcPrompt() {
   }
 }
 
-function performAttack() {
-  if (!self || !game) return;
-  if (!target) {
-    notify("Hãy chọn mục tiêu trước (click hoặc Tab).", "info");
-    return;
-  }
-  const now = performance.now();
-  if (now < attackReadyAt) return;
-  attackReadyAt = now + 800;
-  net.emit("combat:attack", { targetId: target.id, targetType: target.kind });
-}
-
-function performSkill() {
+function performSkill(slot: "Q" | "W" | "E" | "R") {
   if (!self || !content) return;
-  const skill = content.sects[self.sect].skill;
-  if (!target && skill.type !== "MELEE") {
-    notify("Hãy chọn mục tiêu cho tuyệt kỹ.", "info");
+  const skill = content.sects[self.sect].skills[slot];
+  if (!skill) return;
+
+  const isSelfOrAoE = skill.type === "BUFF" || skill.type === "HEAL" || skill.range === 0 || (skill.type === "MELEE" && !target);
+  if (!target && !isSelfOrAoE) {
+    notify("Hãy chọn mục tiêu cho kỹ năng.", "info");
     return;
   }
   if (self.mp < skill.mpCost) {
@@ -894,9 +892,10 @@ function performSkill() {
     return;
   }
   const now = performance.now();
-  if (now < skillReadyAt) return;
-  skillReadyAt = now + skill.cooldownMs;
-  net.emit("combat:skill", { targetId: target?.id ?? null, targetType: target?.kind ?? "monster" });
+  const readyAt = skillCooldownsAt[slot] ?? 0;
+  if (now < readyAt) return;
+  skillCooldownsAt[slot] = now + skill.cooldownMs;
+  net.emit("combat:skill", { slot, targetId: target?.id ?? null, targetType: target?.kind ?? "monster" });
 }
 
 function useHpPotion() {
@@ -939,8 +938,10 @@ function setupGameHud() {
   });
   $("close-panel").addEventListener("click", () => $("side-panel").classList.add("hidden"));
   $("leave-btn").addEventListener("click", leaveGame);
-  $("action-attack").addEventListener("click", performAttack);
-  $("action-skill").addEventListener("click", performSkill);
+  $("action-skill-q").addEventListener("click", () => performSkill("Q"));
+  $("action-skill-w").addEventListener("click", () => performSkill("W"));
+  $("action-skill-e").addEventListener("click", () => performSkill("E"));
+  $("action-skill-r").addEventListener("click", () => performSkill("R"));
   $("action-potion-hp").addEventListener("click", useHpPotion);
   $("action-potion-mp").addEventListener("click", useMpPotion);
 
@@ -973,10 +974,12 @@ function setupGameHud() {
       return;
     }
     keys.add(event.code);
-    if (event.code === "KeyQ" || event.code === "Digit1") performAttack();
-    if (event.code === "KeyW" || event.code === "KeyE" || event.code === "KeyR" || event.code === "Digit2") performSkill();
-    if (event.code === "KeyA" || event.code === "Digit3") useHpPotion();
-    if (event.code === "KeyS") useMpPotion();
+    if (event.code === "KeyQ") performSkill("Q");
+    if (event.code === "KeyW") performSkill("W");
+    if (event.code === "KeyE") performSkill("E");
+    if (event.code === "KeyR") performSkill("R");
+    if (event.code === "Digit1" || event.code === "KeyA") useHpPotion();
+    if (event.code === "Digit2" || event.code === "KeyS") useMpPotion();
     if (event.code === "KeyF" && nearbyNpc) {
       event.preventDefault();
       openShop(nearbyNpc);
@@ -1044,11 +1047,19 @@ function movementLoop() {
 
 function updateCooldowns(now: number) {
   if (!self || !content) return;
-  const attackRemaining = Math.max(0, attackReadyAt - now);
-  const skillRemaining = Math.max(0, skillReadyAt - now);
-  ($("cd-attack") as HTMLElement).style.transform = `scaleY(${Math.min(1, attackRemaining / 800)})`;
-  ($("cd-skill") as HTMLElement).style.transform = `scaleY(${Math.min(1, skillRemaining / content.sects[self.sect].skill.cooldownMs)})`;
-  ($("cd-attack") as HTMLElement).parentElement?.classList.toggle("disabled", attackRemaining > 0);
+  const sectSkills = content.sects[self.sect].skills;
+  const slots: ("Q" | "W" | "E" | "R")[] = ["Q", "W", "E", "R"];
+  for (const slot of slots) {
+    const sk = sectSkills[slot];
+    if (!sk) continue;
+    const readyAt = skillCooldownsAt[slot] ?? 0;
+    const remaining = Math.max(0, readyAt - now);
+    const cdElement = $(`cd-skill-${slot.toLowerCase()}`);
+    if (cdElement) {
+      cdElement.style.transform = `scaleY(${Math.min(1, remaining / sk.cooldownMs)})`;
+      cdElement.parentElement?.classList.toggle("disabled", remaining > 0);
+    }
+  }
 }
 
 async function init() {
