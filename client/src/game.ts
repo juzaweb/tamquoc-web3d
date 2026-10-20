@@ -180,9 +180,11 @@ export class GameClient {
     });
     this.canvas.addEventListener("pointerup", (event) => {
       if (!this.dragging) return;
+      const isTouch = event.pointerType === "touch";
+      const clickThreshold = isTouch ? 18 : 6;
       this.dragging = false;
       this.canvas.releasePointerCapture(event.pointerId);
-      if (this.dragMoved < 6) this.pick(event.clientX, event.clientY);
+      if (this.dragMoved < clickThreshold) this.pick(event.clientX, event.clientY);
     });
     this.canvas.addEventListener("wheel", (event) => {
       event.preventDefault();

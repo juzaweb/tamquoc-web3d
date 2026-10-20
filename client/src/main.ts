@@ -57,11 +57,27 @@ async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   return data;
 }
 
+function checkOrientation() {
+  const isPortrait = window.matchMedia("(orientation: portrait)").matches || window.innerHeight > window.innerWidth;
+  const isMobileOrTablet = window.innerWidth <= 1024 || window.innerHeight <= 1024 || "ontouchstart" in window;
+  const overlay = $("orientation-overlay");
+  overlay.classList.toggle("hidden", !(isPortrait && isMobileOrTablet));
+}
+
+function requestLandscapeLock() {
+  if (screen.orientation && "lock" in screen.orientation) {
+    (screen.orientation.lock as (orientation: string) => Promise<void>)("landscape").catch(() => {
+      // Ignore orientation lock rejection on unsupported browsers or without user activation
+    });
+  }
+}
+
 function showScreen(screen: "auth" | "characters" | "game") {
   currentScreen = screen;
   $("auth-screen").classList.toggle("hidden", screen !== "auth");
   $("character-screen").classList.toggle("hidden", screen !== "characters");
   $("game-screen").classList.toggle("hidden", screen !== "game");
+  checkOrientation();
 }
 
 function showAuthError(message: string) {
@@ -1000,6 +1016,14 @@ function setupGameHud() {
     keys.delete(event.code);
   });
   window.addEventListener("blur", () => keys.clear());
+
+  // Prevent context menu on touch long-presses over game controls and canvas
+  document.addEventListener("contextmenu", (event) => {
+    const targetNode = event.target as HTMLElement | null;
+    if (targetNode && (targetNode.tagName === "CANVAS" || targetNode.closest("#game-screen"))) {
+      event.preventDefault();
+    }
+  });
 }
 
 function movementLoop() {
@@ -1069,6 +1093,12 @@ async function init() {
   setupGameHud();
   bindGameEvents();
   movementLoop();
+
+  window.addEventListener("resize", checkOrientation);
+  window.addEventListener("orientationchange", checkOrientation);
+  window.addEventListener("click", requestLandscapeLock, { once: false });
+  window.addEventListener("touchstart", requestLandscapeLock, { once: false, passive: true });
+  checkOrientation();
 
   try {
     content = await (await fetch("/api/content")).json() as Content;
