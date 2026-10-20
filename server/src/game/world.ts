@@ -329,6 +329,18 @@ export class GameWorld {
     return Math.hypot(a.x - b.x, a.z - b.z);
   }
 
+  private isTargetInFront(attacker: RuntimePlayer, entity: { x: number; z: number }, maxRange: number): boolean {
+    const dx = entity.x - attacker.x;
+    const dz = entity.z - attacker.z;
+    const dist = Math.hypot(dx, dz);
+    if (dist > maxRange) return false;
+    if (dist <= 1.2) return true;
+    const dirX = Math.sin(attacker.rotation);
+    const dirZ = Math.cos(attacker.rotation);
+    const dot = (dx * dirX + dz * dirZ) / dist;
+    return dot >= 0.15;
+  }
+
   private inSafeZone(player: { x: number; z: number }): boolean {
     return Object.values(CITIES).some(
       (city) => Math.hypot(player.x - city.x, player.z - city.z) < CITY_SAFE_RADIUS,
@@ -521,12 +533,6 @@ export class GameWorld {
 
     if (attacker.mp < skill.mpCost) return this.error(socketId, "Không đủ nội lực.");
 
-    // Target checks for targeted skills vs AoE/Buff/Self skills
-    const isSelfOrAoE = skill.type === "BUFF" || skill.type === "HEAL" || skill.range === 0 || (skill.type === "MELEE" && !targetId);
-    if (!targetId && !isSelfOrAoE) {
-      return this.error(socketId, "Cần chọn mục tiêu.");
-    }
-
     // Process Dash mechanic first
     if (skill.type === "DASH" && skill.dashDistance) {
       let dashX = attacker.x;
@@ -630,27 +636,17 @@ export class GameWorld {
       });
     }
 
-    // AoE vs Targeted hit
+    // AoE vs Facing Direction hit
     const isAoE = skill.type === "MELEE" || (skill.type === "STUN" && skill.range <= 8) || (skill.type === "POISON" && skill.range > 5);
-    if (isAoE) {
-      const monsterTargets = [...this.monsters.values()].filter(
-        (m) => !m.dead && this.distance(attacker, m) <= Math.max(skill.range, 6),
-      );
-      for (const m of monsterTargets) await applyToMonster(m);
+    const effectiveRange = isAoE ? Math.max(skill.range, 6) : skill.range + 4;
+    let hitCount = 0;
 
-      if (attacker.pvpEnabled) {
-        for (const p of this.players.values()) {
-          if (p.socketId === socketId || p.dead || p.faction === attacker.faction) continue;
-          if (this.distance(attacker, p) > Math.max(skill.range, 6)) continue;
-          if (this.inSafeZone(attacker) || this.inSafeZone(p)) continue;
-          applyToPlayer(p);
-        }
-      }
-    } else if (targetId) {
+    if (targetId) {
       if (targetType === "monster") {
         const monster = this.monsters.get(targetId);
-        if (monster && !monster.dead && this.distance(attacker, monster) <= skill.range + 4) {
+        if (monster && !monster.dead && this.distance(attacker, monster) <= effectiveRange) {
           await applyToMonster(monster);
+          hitCount++;
         }
       } else {
         const target = this.players.get(targetId);
@@ -662,11 +658,47 @@ export class GameWorld {
           target.faction !== attacker.faction &&
           !this.inSafeZone(attacker) &&
           !this.inSafeZone(target) &&
-          this.distance(attacker, target) <= skill.range + 4
+          this.distance(attacker, target) <= effectiveRange
         ) {
           applyToPlayer(target);
+          hitCount++;
         }
       }
+    } else {
+      const monsterTargets = [...this.monsters.values()].filter(
+        (m) => !m.dead && (isAoE ? this.distance(attacker, m) <= effectiveRange : this.isTargetInFront(attacker, m, effectiveRange)),
+      );
+      for (const m of monsterTargets) {
+        await applyToMonster(m);
+        hitCount++;
+      }
+
+      if (attacker.pvpEnabled) {
+        for (const p of this.players.values()) {
+          if (p.socketId === socketId || p.dead || p.faction === attacker.faction) continue;
+          if (this.inSafeZone(attacker) || this.inSafeZone(p)) continue;
+          if (isAoE ? this.distance(attacker, p) <= effectiveRange : this.isTargetInFront(attacker, p, effectiveRange)) {
+            applyToPlayer(p);
+            hitCount++;
+          }
+        }
+      }
+    }
+
+    if (hitCount === 0 && skill.type !== "HEAL") {
+      this.io.emit("combat:event", {
+        attackerId: attacker.socketId,
+        attackerName: attacker.name,
+        targetId: attacker.socketId,
+        targetType: "player",
+        targetName: attacker.name,
+        damage: 0,
+        crit: false,
+        skill: true,
+        targetHp: attacker.hp,
+        targetMaxHp: attacker.stats.maxHp,
+        killed: false,
+      });
     }
 
     this.emitSelf(attacker);

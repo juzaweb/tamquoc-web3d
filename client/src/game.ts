@@ -105,6 +105,7 @@ export class GameClient {
   private readonly clock = new THREE.Clock();
   private readonly raycaster = new THREE.Raycaster();
   private readonly pointer = new THREE.Vector2();
+  private readonly lastPointerPos = new THREE.Vector2();
   private readonly entities = new Map<string, EntityView>();
   private readonly effects: Effect[] = [];
   private readonly selectionRing: THREE.Mesh;
@@ -164,6 +165,13 @@ export class GameClient {
 
   private bindEvents() {
     window.addEventListener("resize", this.resizeHandler);
+    window.addEventListener("pointermove", (event) => {
+      const rect = this.canvas.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        this.lastPointerPos.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        this.lastPointerPos.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+      }
+    });
     this.canvas.addEventListener("pointerdown", (event) => {
       if (event.button !== 0) return;
       this.dragging = true;
@@ -696,11 +704,42 @@ export class GameClient {
     return { id: next.id, kind: next.kind };
   }
 
+  getGroundPointFromPointer(clientX?: number, clientY?: number): { x: number; z: number } | null {
+    if (clientX !== undefined && clientY !== undefined) {
+      const rect = this.canvas.getBoundingClientRect();
+      this.pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+      this.pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    } else {
+      this.pointer.copy(this.lastPointerPos);
+    }
+    this.raycaster.setFromCamera(this.pointer, this.camera);
+    const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    const groundPoint = new THREE.Vector3();
+    if (this.raycaster.ray.intersectPlane(groundPlane, groundPoint)) {
+      return { x: groundPoint.x, z: groundPoint.z };
+    }
+    return null;
+  }
+
   getLocalPosition(): { x: number; z: number } | null {
     if (!this.localId) return null;
     const entity = this.entities.get(this.localId);
     if (!entity) return null;
     return { x: entity.targetX, z: entity.targetZ };
+  }
+
+  getLocalRotation(): number {
+    if (!this.localId) return 0;
+    const entity = this.entities.get(this.localId);
+    return entity ? entity.group.rotation.y : 0;
+  }
+
+  setLocalRotation(rotation: number) {
+    if (!this.localId) return;
+    const entity = this.entities.get(this.localId);
+    if (!entity) return;
+    entity.targetRotation = rotation;
+    entity.group.rotation.y = rotation;
   }
 
   setLocalTarget(x: number, z: number) {
@@ -731,7 +770,9 @@ export class GameClient {
 
     const numberPos = targetPos.clone();
     numberPos.y += event.targetType === "monster" ? targetEntity.labelHeight * 0.5 : 1.7;
-    this.spawnDamageNumber(numberPos, event);
+    if (event.damage !== 0) {
+      this.spawnDamageNumber(numberPos, event);
+    }
 
     if (event.skill) {
       const sect = attackerEntity?.sect;
