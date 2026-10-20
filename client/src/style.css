@@ -1030,6 +1030,10 @@ input[type="color"] {
   color: #ff8a80;
 }
 
+.action-icon.blue {
+  color: #82b1ff;
+}
+
 .action-label {
   font-size: 10px;
   color: var(--muted);

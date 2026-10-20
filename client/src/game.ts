@@ -110,6 +110,7 @@ export class GameClient {
   private readonly selectionRing: THREE.Mesh;
   private readonly content: Content;
   private readonly onSelect: (id: string | null, kind: EntityKind | null) => void;
+  private readonly onGroundClick?: (point: { x: number; z: number }) => void;
 
   private localId: string | null = null;
   private targetId: string | null = null;
@@ -124,11 +125,17 @@ export class GameClient {
   private readonly cameraTarget = new THREE.Vector3();
   private readonly resizeHandler = () => this.resize();
 
-  constructor(canvas: HTMLCanvasElement, content: Content, onSelect: (id: string | null, kind: EntityKind | null) => void) {
+  constructor(
+    canvas: HTMLCanvasElement,
+    content: Content,
+    onSelect: (id: string | null, kind: EntityKind | null) => void,
+    onGroundClick?: (point: { x: number; z: number }) => void,
+  ) {
     this.canvas = canvas;
     this.container = canvas.parentElement ?? document.body;
     this.content = content;
     this.onSelect = onSelect;
+    this.onGroundClick = onGroundClick;
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
@@ -205,6 +212,15 @@ export class GameClient {
     }
     this.setTarget(null, null);
     this.onSelect(null, null);
+
+    const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    const groundPoint = new THREE.Vector3();
+    if (this.raycaster.ray.intersectPlane(groundPlane, groundPoint)) {
+      this.spawnImpact(groundPoint, 0x6fcf97, 0.6);
+      if (this.onGroundClick) {
+        this.onGroundClick({ x: groundPoint.x, z: groundPoint.z });
+      }
+    }
   }
 
   setSelf(self: SelfState, world: WorldState, socketId: string) {
