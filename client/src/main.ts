@@ -680,6 +680,13 @@ function updateSelfUI() {
       $(`skill-${slot.toLowerCase()}-label`).textContent = sk.name;
       $(`skill-${slot.toLowerCase()}-icon`).textContent = slot;
       $(`action-skill-${slot.toLowerCase()}`).title = `${sk.name} (${slot})\n${sk.description}`;
+
+      const mobLabel = document.getElementById(`mobile-skill-${slot.toLowerCase()}-label`);
+      if (mobLabel) mobLabel.textContent = sk.name;
+      const mobIcon = document.getElementById(`mobile-skill-${slot.toLowerCase()}-icon`);
+      if (mobIcon) mobIcon.textContent = slot;
+      const mobBtn = document.getElementById(`mobile-skill-${slot.toLowerCase()}`);
+      if (mobBtn) mobBtn.title = `${sk.name} (${slot})\n${sk.description}`;
     }
   }
   $("pvp-toggle").textContent = `PvP: ${self.pvpEnabled ? "Bật" : "Tắt"}`;
@@ -1127,12 +1134,161 @@ function setupGameHud() {
   });
   window.addEventListener("blur", () => keys.clear());
 
+  setupVirtualJoystick();
+  setupMobileSkillCluster();
+
   // Prevent context menu on touch long-presses over game controls and canvas
   document.addEventListener("contextmenu", (event) => {
     const targetNode = event.target as HTMLElement | null;
     if (targetNode && (targetNode.tagName === "CANVAS" || targetNode.closest("#game-screen"))) {
       event.preventDefault();
     }
+  });
+}
+
+let joystickTouchId: number | null = null;
+let joystickActive = false;
+let joystickVector = { x: 0, y: 0 };
+let pointerDraggingJoystick = false;
+
+function setupVirtualJoystick() {
+  const joystickEl = document.getElementById("virtual-joystick");
+  const baseEl = document.getElementById("joystick-base");
+  const knobEl = document.getElementById("joystick-knob");
+  if (!joystickEl || !baseEl || !knobEl) return;
+
+  const maxRadius = 45;
+
+  function updateKnobPosition(clientX: number, clientY: number) {
+    const rect = baseEl!.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+
+    let dx = clientX - centerX;
+    let dy = clientY - centerY;
+    const dist = Math.hypot(dx, dy);
+
+    if (dist > maxRadius) {
+      dx = (dx / dist) * maxRadius;
+      dy = (dy / dist) * maxRadius;
+    }
+
+    knobEl!.style.transform = `translate(${dx}px, ${dy}px)`;
+    joystickVector.x = dx / maxRadius;
+    joystickVector.y = -dy / maxRadius;
+    joystickActive = true;
+    clickTargetPosition = null;
+  }
+
+  function resetJoystick() {
+    joystickTouchId = null;
+    pointerDraggingJoystick = false;
+    joystickActive = false;
+    joystickVector.x = 0;
+    joystickVector.y = 0;
+    knobEl!.style.transform = "translate(0px, 0px)";
+    knobEl!.classList.remove("active");
+    baseEl!.classList.remove("active");
+  }
+
+  joystickEl.addEventListener("touchstart", (e: TouchEvent) => {
+    e.preventDefault();
+    if (joystickTouchId !== null) return;
+    const touch = e.changedTouches[0];
+    if (!touch) return;
+    joystickTouchId = touch.identifier;
+    knobEl.classList.add("active");
+    baseEl.classList.add("active");
+    updateKnobPosition(touch.clientX, touch.clientY);
+  }, { passive: false });
+
+  window.addEventListener("touchmove", (e: TouchEvent) => {
+    if (joystickTouchId === null) return;
+    for (const touch of Array.from(e.changedTouches)) {
+      if (touch.identifier === joystickTouchId) {
+        e.preventDefault();
+        updateKnobPosition(touch.clientX, touch.clientY);
+        break;
+      }
+    }
+  }, { passive: false });
+
+  window.addEventListener("touchend", (e: TouchEvent) => {
+    if (joystickTouchId === null) return;
+    for (const touch of Array.from(e.changedTouches)) {
+      if (touch.identifier === joystickTouchId) {
+        resetJoystick();
+        break;
+      }
+    }
+  });
+
+  window.addEventListener("touchcancel", (e: TouchEvent) => {
+    if (joystickTouchId === null) return;
+    for (const touch of Array.from(e.changedTouches)) {
+      if (touch.identifier === joystickTouchId) {
+        resetJoystick();
+        break;
+      }
+    }
+  });
+
+  joystickEl.addEventListener("pointerdown", (e: PointerEvent) => {
+    if (e.pointerType === "touch") return;
+    e.preventDefault();
+    pointerDraggingJoystick = true;
+    knobEl.classList.add("active");
+    baseEl.classList.add("active");
+    joystickEl.setPointerCapture(e.pointerId);
+    updateKnobPosition(e.clientX, e.clientY);
+  });
+
+  joystickEl.addEventListener("pointermove", (e: PointerEvent) => {
+    if (!pointerDraggingJoystick) return;
+    updateKnobPosition(e.clientX, e.clientY);
+  });
+
+  joystickEl.addEventListener("pointerup", () => {
+    if (pointerDraggingJoystick) resetJoystick();
+  });
+
+  joystickEl.addEventListener("pointercancel", () => {
+    if (pointerDraggingJoystick) resetJoystick();
+  });
+}
+
+function bindTouchOrClick(elementId: string, action: () => void) {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+  let touchHandled = false;
+  el.addEventListener("touchstart", (e: TouchEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    touchHandled = true;
+    action();
+  }, { passive: false });
+
+  el.addEventListener("click", () => {
+    if (touchHandled) {
+      touchHandled = false;
+      return;
+    }
+    action();
+  });
+}
+
+function setupMobileSkillCluster() {
+  bindTouchOrClick("mobile-attack-btn", () => performSkill("Q"));
+  bindTouchOrClick("mobile-skill-q", () => performSkill("Q"));
+  bindTouchOrClick("mobile-skill-w", () => performSkill("W"));
+  bindTouchOrClick("mobile-skill-e", () => performSkill("E"));
+  bindTouchOrClick("mobile-skill-r", () => performSkill("R"));
+  bindTouchOrClick("mobile-potion-hp", () => useHpPotion());
+  bindTouchOrClick("mobile-potion-mp", () => useMpPotion());
+  bindTouchOrClick("mobile-target-btn", () => {
+    const next = game?.cycleTarget() ?? null;
+    target = next;
+    updateTargetFrame();
   });
 }
 
@@ -1148,10 +1304,39 @@ function movementLoop() {
     return;
   }
 
-  if (!clickTargetPosition) return;
-
   const position = game.getLocalPosition();
   if (!position) return;
+
+  if (joystickActive && (joystickVector.x !== 0 || joystickVector.y !== 0)) {
+    clickTargetPosition = null;
+    const basis = game.getMovementBasis();
+    let moveDirX = basis.forward.x * joystickVector.y + basis.right.x * joystickVector.x;
+    let moveDirZ = basis.forward.z * joystickVector.y + basis.right.z * joystickVector.x;
+    const len = Math.hypot(moveDirX, moveDirZ);
+    if (len > 0.05) {
+      if (len > 1) {
+        moveDirX /= len;
+        moveDirZ /= len;
+      }
+      const step = self.stats.moveSpeed * dt;
+      const radius = content?.world.radius ?? 110;
+      const nextX = Math.max(-radius, Math.min(radius, position.x + moveDirX * step));
+      const nextZ = Math.max(-radius, Math.min(radius, position.z + moveDirZ * step));
+
+      if (!content || !crossesCityWall(content.world, position.x, position.z, nextX, nextZ)) {
+        game.setLocalTarget(nextX, nextZ);
+        const rot = Math.atan2(moveDirX, moveDirZ);
+        game.setLocalRotation(rot);
+        if (now - lastMoveSentAt > 90) {
+          lastMoveSentAt = now;
+          net.emit("player:move", { x: nextX, z: nextZ, rotation: rot });
+        }
+      }
+    }
+    return;
+  }
+
+  if (!clickTargetPosition) return;
 
   const dist = Math.hypot(clickTargetPosition.x - position.x, clickTargetPosition.z - position.z);
   if (dist < 0.25) {
@@ -1192,6 +1377,11 @@ function updateCooldowns(now: number) {
     if (cdElement) {
       cdElement.style.transform = `scaleY(${Math.min(1, remaining / sk.cooldownMs)})`;
       cdElement.parentElement?.classList.toggle("disabled", remaining > 0);
+    }
+    const mobCdElement = document.getElementById(`mobile-cd-skill-${slot.toLowerCase()}`);
+    if (mobCdElement) {
+      mobCdElement.style.transform = `scaleY(${Math.min(1, remaining / sk.cooldownMs)})`;
+      mobCdElement.parentElement?.classList.toggle("disabled", remaining > 0);
     }
   }
 }

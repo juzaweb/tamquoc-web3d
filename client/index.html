@@ -201,6 +201,56 @@
           </form>
         </div>
 
+        <!-- Virtual Joystick (Mobile Left Thumb) -->
+        <div id="virtual-joystick" class="virtual-joystick">
+          <div id="joystick-base" class="joystick-base">
+            <div class="joystick-ring"></div>
+            <div id="joystick-knob" class="joystick-knob"></div>
+          </div>
+        </div>
+
+        <!-- Mobile Skill Cluster (Mobile Right Thumb - Surrounding Skill Buttons) -->
+        <div id="mobile-skill-cluster" class="mobile-skill-cluster">
+          <div class="skill-cluster-center">
+            <button class="cluster-btn btn-attack" id="mobile-attack-btn" title="Đánh thường / Q">
+              <span class="cluster-icon" id="mobile-attack-icon">⚔</span>
+              <span class="cluster-label">Đánh</span>
+            </button>
+          </div>
+          <button class="cluster-btn btn-skill pos-q" id="mobile-skill-q" title="Kỹ năng Q">
+            <span class="cluster-icon" id="mobile-skill-q-icon">Q</span>
+            <span class="cluster-label" id="mobile-skill-q-label">Q</span>
+            <span class="cooldown" id="mobile-cd-skill-q"></span>
+          </button>
+          <button class="cluster-btn btn-skill pos-w" id="mobile-skill-w" title="Kỹ năng W">
+            <span class="cluster-icon" id="mobile-skill-w-icon">W</span>
+            <span class="cluster-label" id="mobile-skill-w-label">W</span>
+            <span class="cooldown" id="mobile-cd-skill-w"></span>
+          </button>
+          <button class="cluster-btn btn-skill pos-e" id="mobile-skill-e" title="Kỹ năng E">
+            <span class="cluster-icon" id="mobile-skill-e-icon">E</span>
+            <span class="cluster-label" id="mobile-skill-e-label">E</span>
+            <span class="cooldown" id="mobile-cd-skill-e"></span>
+          </button>
+          <button class="cluster-btn btn-skill pos-r" id="mobile-skill-r" title="Kỹ năng R">
+            <span class="cluster-icon" id="mobile-skill-r-icon">R</span>
+            <span class="cluster-label" id="mobile-skill-r-label">R</span>
+            <span class="cooldown" id="mobile-cd-skill-r"></span>
+          </button>
+          <button class="cluster-btn btn-potion pos-hp" id="mobile-potion-hp" title="Hồi Huyết Đan">
+            <span class="cluster-icon red">丹</span>
+            <span class="cluster-label">HP</span>
+          </button>
+          <button class="cluster-btn btn-potion pos-mp" id="mobile-potion-mp" title="Hồi Khí Đan">
+            <span class="cluster-icon blue">氣</span>
+            <span class="cluster-label">MP</span>
+          </button>
+          <button class="cluster-btn btn-target pos-target" id="mobile-target-btn" title="Chuyển mục tiêu">
+            <span class="cluster-icon">🎯</span>
+            <span class="cluster-label">Mục tiêu</span>
+          </button>
+        </div>
+
         <div class="action-bar">
           <button class="action-slot" id="action-skill-q" title="Kỹ năng Q">
             <span class="action-key">Q</span>

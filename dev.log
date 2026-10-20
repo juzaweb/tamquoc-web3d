@@ -2,22 +2,33 @@
 > tamquoc-online@0.1.0 dev
 > concurrently -n server,client -c blue,green "npm:dev:server" "npm:dev:client"
 
+[client]
+[client] > tamquoc-online@0.1.0 dev:client
+[client] > vite
+[client]
 [server]
 [server] > tamquoc-online@0.1.0 dev:server
 [server] > tsx watch server/src/index.ts
 [server]
 [client]
-[client] > tamquoc-online@0.1.0 dev:client
-[client] > vite
-[client]
-[client]
-[client]   VITE v6.4.4  ready in 230 ms
+[client]   VITE v6.4.4  ready in 247 ms
 [client]
 [client]   ➜  Local:   http://localhost:5173/
 [client]   ➜  Network: use --host to expose
-[server] {"level":30,"time":1792471617116,"pid":39369,"hostname":"devbox","msg":"Server listening at http://127.0.0.1:3001"}
-[server] {"level":30,"time":1792471617116,"pid":39369,"hostname":"devbox","msg":"Server listening at http://192.168.0.2:3001"}
-[server] {"level":30,"time":1792471646345,"pid":39369,"hostname":"devbox","reqId":"req-1","req":{"method":"GET","url":"/api/content","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":59872},"msg":"incoming request"}
-[server] {"level":30,"time":1792471646352,"pid":39369,"hostname":"devbox","reqId":"req-1","res":{"statusCode":200},"responseTime":7.0299379999996745,"msg":"request completed"}
-[server] {"level":30,"time":1792471648839,"pid":39369,"hostname":"devbox","reqId":"req-2","req":{"method":"GET","url":"/api/content","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":59878},"msg":"incoming request"}
-[server] {"level":30,"time":1792471648840,"pid":39369,"hostname":"devbox","reqId":"req-2","res":{"statusCode":200},"responseTime":1.3796629999997094,"msg":"request completed"}
+[server] {"level":30,"time":1792471921925,"pid":51603,"hostname":"devbox","msg":"Server listening at http://127.0.0.1:3001"}
+[server] {"level":30,"time":1792471921926,"pid":51603,"hostname":"devbox","msg":"Server listening at http://192.168.0.2:3001"}
+[server] {"level":30,"time":1792471975272,"pid":51603,"hostname":"devbox","reqId":"req-1","req":{"method":"GET","url":"/api/content","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":33190},"msg":"incoming request"}
+[server] {"level":30,"time":1792471975281,"pid":51603,"hostname":"devbox","reqId":"req-1","res":{"statusCode":200},"responseTime":8.059788999999,"msg":"request completed"}
+[server] {"level":30,"time":1792471975666,"pid":51603,"hostname":"devbox","reqId":"req-2","req":{"method":"POST","url":"/api/auth/register","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":33204},"msg":"incoming request"}
+[server] {"level":30,"time":1792471975858,"pid":51603,"hostname":"devbox","reqId":"req-2","res":{"statusCode":200},"responseTime":191.07355500000267,"msg":"request completed"}
+[server] {"level":30,"time":1792471975876,"pid":51603,"hostname":"devbox","reqId":"req-3","req":{"method":"GET","url":"/api/auth/me","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":33220},"msg":"incoming request"}
+[server] {"level":30,"time":1792471975879,"pid":51603,"hostname":"devbox","reqId":"req-3","res":{"statusCode":200},"responseTime":2.225619999997434,"msg":"request completed"}
+[server] {"level":30,"time":1792471975889,"pid":51603,"hostname":"devbox","reqId":"req-4","req":{"method":"GET","url":"/api/characters","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":33222},"msg":"incoming request"}
+[server] {"level":30,"time":1792471975892,"pid":51603,"hostname":"devbox","reqId":"req-4","res":{"statusCode":200},"responseTime":3.2109310000014375,"msg":"request completed"}
+[server] {"level":30,"time":1792471976054,"pid":51603,"hostname":"devbox","reqId":"req-5","req":{"method":"POST","url":"/api/characters","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":33232},"msg":"incoming request"}
+[server] {"level":30,"time":1792471976071,"pid":51603,"hostname":"devbox","reqId":"req-5","res":{"statusCode":201},"responseTime":16.268007000006037,"msg":"request completed"}
+[server] {"level":30,"time":1792471976078,"pid":51603,"hostname":"devbox","reqId":"req-6","req":{"method":"GET","url":"/api/characters","host":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":33246},"msg":"incoming request"}
+[server] {"level":30,"time":1792471976082,"pid":51603,"hostname":"devbox","reqId":"req-6","res":{"statusCode":200},"responseTime":3.2957860000024084,"msg":"request completed"}
+[server] {"level":30,"time":1792472023984,"pid":51603,"hostname":"devbox","signal":"SIGTERM","msg":"Shutting down"}
+[client] npm run dev:client exited with code SIGTERM
+[server] npm run dev:server exited with code SIGTERM

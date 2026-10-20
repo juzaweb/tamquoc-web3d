@@ -990,6 +990,237 @@ input[type="color"] {
   font-size: 12px;
 }
 
+/* Virtual Joystick & Mobile Skill Cluster Styles */
+
+.virtual-joystick {
+  position: absolute;
+  left: max(20px, env(safe-area-inset-left));
+  bottom: max(20px, env(safe-area-inset-bottom));
+  width: 130px;
+  height: 130px;
+  z-index: 10;
+  touch-action: none;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.joystick-base {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(16, 20, 30, 0.65) 0%, rgba(8, 10, 16, 0.8) 100%);
+  border: 2px solid rgba(217, 179, 108, 0.35);
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.5), inset 0 0 12px rgba(217, 179, 108, 0.1);
+  backdrop-filter: blur(6px);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.joystick-base.active {
+  border-color: var(--gold-bright);
+  background: radial-gradient(circle, rgba(28, 34, 50, 0.75) 0%, rgba(12, 16, 26, 0.9) 100%);
+  box-shadow: 0 0 25px rgba(217, 179, 108, 0.25), inset 0 0 16px rgba(217, 179, 108, 0.2);
+}
+
+.joystick-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 60px;
+  height: 60px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 1px dashed rgba(217, 179, 108, 0.25);
+  pointer-events: none;
+}
+
+.joystick-knob {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 52px;
+  height: 52px;
+  margin-top: -26px;
+  margin-left: -26px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #e0c06a, #8a6b26);
+  border: 2px solid var(--gold-bright);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6), inset 0 2px 4px rgba(255, 255, 255, 0.4);
+  will-change: transform;
+  pointer-events: none;
+}
+
+.joystick-knob.active {
+  background: radial-gradient(circle at 35% 35%, #fff2be, #b38b32);
+  box-shadow: 0 0 15px rgba(242, 211, 145, 0.6), inset 0 2px 6px rgba(255, 255, 255, 0.6);
+}
+
+.mobile-skill-cluster {
+  position: absolute;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  width: 220px;
+  height: 220px;
+  z-index: 10;
+  touch-action: none;
+  user-select: none;
+}
+
+.skill-cluster-center {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+}
+
+.cluster-btn {
+  position: absolute;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--border);
+  background: linear-gradient(150deg, rgba(32, 36, 48, 0.92), rgba(12, 14, 20, 0.92));
+  color: var(--text);
+  cursor: pointer;
+  padding: 0;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+  overflow: hidden;
+  transition: border-color 0.15s ease, transform 0.1s ease;
+}
+
+.cluster-btn:active,
+.cluster-btn.active {
+  transform: scale(0.92);
+  border-color: var(--gold-bright);
+  background: linear-gradient(150deg, rgba(52, 58, 76, 0.95), rgba(22, 26, 36, 0.95));
+}
+
+.cluster-btn.disabled {
+  opacity: 0.5;
+  filter: grayscale(0.5);
+}
+
+.cluster-btn .cluster-icon {
+  font-size: 18px;
+  color: var(--gold-bright);
+  line-height: 1;
+}
+
+.cluster-btn .cluster-icon.red {
+  color: #ff8a80;
+}
+
+.cluster-btn .cluster-icon.blue {
+  color: #82b1ff;
+}
+
+.cluster-btn .cluster-label {
+  font-size: 9px;
+  color: var(--muted);
+  margin-top: 1px;
+  line-height: 1;
+  white-space: nowrap;
+  max-width: 90%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.btn-attack {
+  position: relative;
+  width: 68px;
+  height: 68px;
+  border-width: 2px;
+  border-color: var(--gold-bright);
+  background: radial-gradient(circle at 35% 35%, #a83636, #591b1b);
+  box-shadow: 0 4px 18px rgba(178, 58, 58, 0.5), inset 0 2px 4px rgba(255, 255, 255, 0.3);
+}
+
+.btn-attack .cluster-icon {
+  font-size: 26px;
+  color: #fff4dc;
+}
+
+.btn-attack .cluster-label {
+  color: #f2d391;
+  font-weight: 600;
+  font-size: 10px;
+}
+
+.btn-attack:active {
+  background: radial-gradient(circle at 35% 35%, #c74242, #782424);
+  box-shadow: 0 0 22px rgba(224, 90, 79, 0.7);
+}
+
+.btn-skill {
+  width: 52px;
+  height: 52px;
+}
+
+.btn-potion {
+  width: 44px;
+  height: 44px;
+}
+
+.btn-target {
+  width: 46px;
+  height: 46px;
+  background: linear-gradient(150deg, rgba(24, 32, 46, 0.92), rgba(10, 14, 22, 0.92));
+}
+
+/* Arc/Surrounding Layout for Skill Buttons */
+.pos-q {
+  right: 88px;
+  bottom: 8px;
+}
+
+.pos-w {
+  right: 76px;
+  bottom: 68px;
+}
+
+.pos-e {
+  right: 46px;
+  bottom: 114px;
+}
+
+.pos-r {
+  right: 0px;
+  bottom: 142px;
+}
+
+.pos-hp {
+  right: 146px;
+  bottom: 8px;
+}
+
+.pos-mp {
+  right: 136px;
+  bottom: 58px;
+}
+
+.pos-target {
+  right: 106px;
+  bottom: 122px;
+}
+
+/* Show mobile joystick & skill cluster on touch devices or smaller screens, and hide flat action-bar on small screens */
+@media (max-width: 1024px), (hover: none) and (pointer: coarse) {
+  .action-bar {
+    display: none !important;
+  }
+}
+
+@media (min-width: 1025px) and (hover: hover) and (pointer: fine) {
+  .virtual-joystick,
+  .mobile-skill-cluster {
+    display: none;
+  }
+}
+
 .action-bar {
   position: absolute;
   bottom: 20px;
