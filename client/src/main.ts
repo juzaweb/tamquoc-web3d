@@ -32,6 +32,7 @@ let game: GameClient | null = null;
 let target: { id: string; kind: "monster" | "player" } | null = null;
 let currentScreen: "auth" | "characters" | "game" = "auth";
 let skillCooldownsAt: Record<string, number> = { Q: 0, W: 0, E: 0, R: 0 };
+let basicAttackReadyAt = 0;
 let potionReadyAt = 0;
 let lastMoveSentAt = 0;
 let lastFrameAt = performance.now();
@@ -995,6 +996,32 @@ function updateNpcPrompt() {
   }
 }
 
+function performBasicAttack() {
+  if (!self || !content) return;
+  const now = performance.now();
+  if (now < basicAttackReadyAt) return;
+  basicAttackReadyAt = now + 800;
+
+  if (game && !isMobileDevice()) {
+    const groundPoint = game.getGroundPointFromPointer(lastMouseX, lastMouseY);
+    const selfPos = game.getLocalPosition();
+    if (groundPoint && selfPos) {
+      const dx = groundPoint.x - selfPos.x;
+      const dz = groundPoint.z - selfPos.z;
+      if (Math.hypot(dx, dz) > 0.1) {
+        const aimRotation = Math.atan2(dx, dz);
+        game.setLocalRotation(aimRotation);
+        net.emit("player:move", { x: selfPos.x, z: selfPos.z, rotation: aimRotation });
+      }
+    }
+  }
+
+  net.emit("combat:attack", {
+    targetId: target?.id ?? null,
+    targetType: target?.kind ?? "monster",
+  });
+}
+
 function performSkill(slot: "Q" | "W" | "E" | "R") {
   if (!self || !content) return;
   const skill = content.sects[self.sect].skills[slot];
@@ -1109,6 +1136,7 @@ function setupGameHud() {
       return;
     }
     keys.add(event.code);
+    if (event.code === "Space") performBasicAttack();
     if (event.code === "KeyQ") performSkill("Q");
     if (event.code === "KeyW") performSkill("W");
     if (event.code === "KeyE") performSkill("E");
@@ -1280,7 +1308,7 @@ function bindTouchOrClick(elementId: string, action: () => void) {
 }
 
 function setupMobileSkillCluster() {
-  bindTouchOrClick("mobile-attack-btn", () => performSkill("Q"));
+  bindTouchOrClick("mobile-attack-btn", () => performBasicAttack());
   bindTouchOrClick("mobile-skill-q", () => performSkill("Q"));
   bindTouchOrClick("mobile-skill-w", () => performSkill("W"));
   bindTouchOrClick("mobile-skill-e", () => performSkill("E"));

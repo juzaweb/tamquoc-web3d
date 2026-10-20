@@ -10,8 +10,8 @@ const moveSchema = z.object({
   rotation: z.number().finite().optional(),
 });
 const targetSchema = z.object({
-  targetId: z.string().min(1).nullable(),
-  targetType: z.enum(["monster", "player"]),
+  targetId: z.string().nullable().optional(),
+  targetType: z.enum(["monster", "player"]).optional().default("monster"),
 });
 const skillSchema = z.object({
   slot: z.enum(["Q", "W", "E", "R"]).optional().default("Q"),

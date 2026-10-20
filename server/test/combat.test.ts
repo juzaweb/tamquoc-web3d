@@ -147,3 +147,41 @@ test("useSkill without targetId rotates skill direction with player rotation", a
   assert.ok(monsterAtNegativeZ.hp < 100, "Monster at -Z should take damage when facing -Z");
   assert.equal(monsterAtPositiveZ.hp, 100, "Monster at +Z should not take damage when facing -Z");
 });
+
+test("basicAttack does not require MP and does not reduce MP", async () => {
+  const { world } = createHarness();
+  const player = fakePlayer({ x: 0, z: 0, rotation: 0, mp: 0 });
+  const monster = fakeMonster({ id: "m1", x: 0, z: 2, hp: 100, maxHp: 100 });
+
+  const playersMap = (world as unknown as { players: Map<string, RuntimePlayer> }).players;
+  const monstersMap = (world as unknown as { monsters: Map<string, RuntimeMonster> }).monsters;
+
+  monstersMap.clear();
+  playersMap.set(player.socketId, player);
+  monstersMap.set(monster.id, monster);
+
+  await world.basicAttack(player.socketId, monster.id, "monster");
+
+  assert.ok(monster.hp < 100, "Monster should take damage from basic attack with 0 MP");
+  assert.equal(player.mp, 0, "Player MP should remain 0 after basic attack");
+});
+
+test("basicAttack without targetId hits facing monster in range", async () => {
+  const { world } = createHarness();
+  const player = fakePlayer({ x: 0, z: 0, rotation: 0, mp: 0 });
+  const monsterInFront = fakeMonster({ id: "m_front", x: 0, z: 2, hp: 100, maxHp: 100 });
+  const monsterBehind = fakeMonster({ id: "m_behind", x: 0, z: -2, hp: 100, maxHp: 100 });
+
+  const playersMap = (world as unknown as { players: Map<string, RuntimePlayer> }).players;
+  const monstersMap = (world as unknown as { monsters: Map<string, RuntimeMonster> }).monsters;
+
+  monstersMap.clear();
+  playersMap.set(player.socketId, player);
+  monstersMap.set(monsterInFront.id, monsterInFront);
+  monstersMap.set(monsterBehind.id, monsterBehind);
+
+  await world.basicAttack(player.socketId, null, "monster");
+
+  assert.ok(monsterInFront.hp < 100, "Monster in front should take damage from untargeted basic attack");
+  assert.equal(monsterBehind.hp, 100, "Monster behind should not take damage from untargeted basic attack");
+});

@@ -477,36 +477,87 @@ export class GameWorld {
     this.maybeEnableGatePvp(player);
   }
 
-  async basicAttack(socketId: string, targetId: string, targetType: "monster" | "player") {
+  async basicAttack(socketId: string, targetId?: string | null, targetType: "monster" | "player" = "monster") {
     const attacker = this.players.get(socketId);
     if (!attacker || attacker.dead) return;
     const now = Date.now();
     if (now < attacker.stunnedUntil) return this.error(socketId, "Bạn đang bị choáng!");
     if (now - attacker.lastAttackAt < BASIC_COOLDOWN_MS) return;
-    attacker.lastAttackAt = now;
-    attacker.lastCombatAt = now;
 
     const attackRange = SECTS[attacker.sect]?.attackRange ?? DEFAULT_ATTACK_RANGE;
 
-    if (targetType === "monster") {
-      const monster = this.monsters.get(targetId);
-      if (!monster || monster.dead) return this.error(socketId, "Mục tiêu không còn tồn tại.");
-      if (this.distance(attacker, monster) > attackRange) return this.error(socketId, "Mục tiêu quá xa.");
-      const { damage, crit } = rollDamage(attacker.stats.attack, monster.defense, 1);
-      await this.damageMonster(attacker, monster, damage, false, 1, crit);
-      return;
+    let monster: RuntimeMonster | undefined;
+    let targetPlayer: RuntimePlayer | undefined;
+
+    if (targetId) {
+      if (targetType === "monster") {
+        monster = this.monsters.get(targetId);
+        if (monster && monster.dead) monster = undefined;
+        if (monster && this.distance(attacker, monster) > attackRange) {
+          return this.error(socketId, "Mục tiêu quá xa.");
+        }
+      } else {
+        targetPlayer = this.players.get(targetId);
+        if (targetPlayer && (targetPlayer.dead || targetPlayer.socketId === socketId)) targetPlayer = undefined;
+        if (targetPlayer) {
+          if (!attacker.pvpEnabled) return this.error(socketId, "Bật PvP trước khi tấn công người chơi khác.");
+          if (targetPlayer.faction === attacker.faction) return this.error(socketId, "Không thể tấn công người cùng phe.");
+          if (this.inSafeZone(attacker) || this.inSafeZone(targetPlayer)) {
+            return this.error(socketId, "Không thể giao chiến trong khu vực an toàn của thành.");
+          }
+          if (this.distance(attacker, targetPlayer) > attackRange) return this.error(socketId, "Mục tiêu quá xa.");
+        }
+      }
     }
 
-    const target = this.players.get(targetId);
-    if (!target || target.dead || target.socketId === socketId) return this.error(socketId, "Mục tiêu không hợp lệ.");
-    if (!attacker.pvpEnabled) return this.error(socketId, "Bật PvP trước khi tấn công người chơi khác.");
-    if (target.faction === attacker.faction) return this.error(socketId, "Không thể tấn công người cùng phe.");
-    if (this.inSafeZone(attacker) || this.inSafeZone(target)) {
-      return this.error(socketId, "Không thể giao chiến trong khu vực an toàn của thành.");
+    if (!monster && !targetPlayer) {
+      const monsterTargets = [...this.monsters.values()].filter(
+        (m) => !m.dead && this.isTargetInFront(attacker, m, attackRange),
+      );
+      if (monsterTargets.length > 0) {
+        monsterTargets.sort((a, b) => this.distance(attacker, a) - this.distance(attacker, b));
+        monster = monsterTargets[0];
+      } else if (attacker.pvpEnabled) {
+        const playerTargets = [...this.players.values()].filter(
+          (p) =>
+            p.socketId !== socketId &&
+            !p.dead &&
+            p.faction !== attacker.faction &&
+            !this.inSafeZone(attacker) &&
+            !this.inSafeZone(p) &&
+            this.isTargetInFront(attacker, p, attackRange),
+        );
+        if (playerTargets.length > 0) {
+          playerTargets.sort((a, b) => this.distance(attacker, a) - this.distance(attacker, b));
+          targetPlayer = playerTargets[0];
+        }
+      }
     }
-    if (this.distance(attacker, target) > attackRange) return this.error(socketId, "Mục tiêu quá xa.");
-    const { damage, crit } = rollDamage(attacker.stats.attack, target.stats.defense, 1);
-    this.damagePlayer(attacker, target, damage, false, crit);
+
+    attacker.lastAttackAt = now;
+    attacker.lastCombatAt = now;
+
+    if (monster) {
+      const { damage, crit } = rollDamage(attacker.stats.attack, monster.defense, 1);
+      await this.damageMonster(attacker, monster, damage, false, 1, crit);
+    } else if (targetPlayer) {
+      const { damage, crit } = rollDamage(attacker.stats.attack, targetPlayer.stats.defense, 1);
+      this.damagePlayer(attacker, targetPlayer, damage, false, crit);
+    } else {
+      this.io.emit("combat:event", {
+        attackerId: attacker.socketId,
+        attackerName: attacker.name,
+        targetId: attacker.socketId,
+        targetType: "player",
+        targetName: attacker.name,
+        damage: 0,
+        crit: false,
+        skill: false,
+        targetHp: attacker.hp,
+        targetMaxHp: attacker.stats.maxHp,
+        killed: false,
+      });
+    }
   }
 
   async useSkill(
