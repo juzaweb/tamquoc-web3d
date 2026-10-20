@@ -82,7 +82,30 @@ npm run build
 npm start
 ```
 
-Mở `http://localhost:3001`. Server tự phục vụ thư mục `dist/client`.
+Mở `http://localhost:3001`. Nếu truy cập trực tiếp server, nó tự phục vụ thư mục `dist/client`.
+
+### Nginx cho production
+
+Mẫu cấu hình nằm tại [`deploy/nginx/tamquoc-online.conf`](deploy/nginx/tamquoc-online.conf). Nginx phục vụ frontend tĩnh trực tiếp từ `dist/client` (được build bởi `npm run build`); chỉ `/api` và `/socket.io` được chuyển tiếp đến Node.js trên `127.0.0.1:3001`.
+
+1. Thay `demo.example.com` bằng tên miền của bạn.
+2. Build và chép frontend vào đúng đường dẫn `root` trong cấu hình (mặc định `/var/www/tamquoc-online/dist/client`):
+
+```bash
+npm run build
+sudo mkdir -p /var/www/tamquoc-online/dist/client
+sudo cp -a dist/client/. /var/www/tamquoc-online/dist/client/
+```
+
+3. Cài file cấu hình vào thư mục Nginx được nạp bên trong khối `http` (ví dụ `/etc/nginx/conf.d/tamquoc-online.conf`). Nếu cần, chỉnh `root` theo đường dẫn frontend trên máy chủ.
+4. Đảm bảo backend production đang chạy trên cổng `3001`, sau đó kiểm tra và nạp lại Nginx:
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+Mẫu này lắng nghe HTTP trên cổng 80; hãy cấu hình TLS cho tên miền trước khi dùng công khai.
 
 ### Kiểm thử
 
