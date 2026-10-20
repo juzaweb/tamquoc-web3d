@@ -1,4 +1,5 @@
 import "./style.css";
+import { registerSW } from "virtual:pwa-register";
 import { GameClient } from "./game";
 import { crossesCityWall } from "./collision";
 import { Net } from "./net";
@@ -1110,6 +1111,8 @@ function updateCooldowns(now: number) {
     }
   }
 }
+
+registerSW({ immediate: true });
 
 async function init() {
   setupAuthTabs();
