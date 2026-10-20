@@ -185,10 +185,17 @@ test("boss is flagged and higher level than regular monsters", () => {
   assert.ok((boss?.level ?? 0) > highestRegular);
 });
 
-test("all sects have specific attack ranges and skill ranges defined", () => {
+test("all sects have specific attack ranges and four skills defined", () => {
   for (const sect of Object.values(SECTS)) {
     assert.ok(sect.attackRange > 0, `${sect.id} missing valid attackRange`);
-    assert.ok(sect.skill.range > 0, `${sect.id} missing valid skill range`);
+    for (const slot of ["Q", "W", "E", "R"] as const) {
+      const skill = sect.skills[slot];
+      assert.ok(skill, `sect ${sect.id} missing skill slot ${slot}`);
+      assert.equal(skill.slot, slot);
+      assert.ok(skill.name.length > 0);
+      assert.ok(skill.mpCost > 0);
+      assert.ok(skill.cooldownMs > 0);
+    }
   }
   assert.ok(SECTS.WUDANG.attackRange > SECTS.SHAOLIN.attackRange, "Wudang ranged attack should be longer than Shaolin melee attack");
   assert.ok(SECTS.EMEI.attackRange > SECTS.SHAOLIN.attackRange, "Emei mid-range attack should be longer than Shaolin melee attack");

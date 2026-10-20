@@ -13,6 +13,11 @@ const targetSchema = z.object({
   targetId: z.string().min(1).nullable(),
   targetType: z.enum(["monster", "player"]),
 });
+const skillSchema = z.object({
+  slot: z.enum(["Q", "W", "E", "R"]).optional().default("Q"),
+  targetId: z.string().min(1).nullable(),
+  targetType: z.enum(["monster", "player"]),
+});
 const chatSchema = z.object({
   channel: z.enum(["global", "faction"]).default("global"),
   message: z.string().min(1).max(240),
@@ -66,10 +71,10 @@ export function registerSocketHandlers(io: Server, world: GameWorld) {
     });
 
     socket.on("combat:skill", (payload) => {
-      const parsed = targetSchema.safeParse(payload);
+      const parsed = skillSchema.safeParse(payload);
       if (!parsed.success) return;
       run(
-        world.useSkill(socket.id, parsed.data.targetId, parsed.data.targetType),
+        world.useSkill(socket.id, parsed.data.slot, parsed.data.targetId, parsed.data.targetType),
         "Không thể sử dụng tuyệt kỹ.",
       );
     });

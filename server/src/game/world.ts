@@ -80,6 +80,8 @@ function freshMonster(id: string, monsterId: string, x: number, z: number, areaR
     poisonDamage: 0,
     poisonTickAt: 0,
     poisonSourceId: null,
+    stunnedUntil: 0,
+    slowUntil: 0,
   };
 }
 
@@ -197,6 +199,8 @@ export class GameWorld {
           monster.dead = false;
           monster.hp = monster.maxHp;
           monster.targetPlayerId = null;
+          monster.stunnedUntil = 0;
+          monster.slowUntil = 0;
           monster.x = monster.spawnX + (Math.random() - 0.5) * monster.areaRadius;
           monster.z = monster.spawnZ + (Math.random() - 0.5) * monster.areaRadius;
         }
@@ -212,6 +216,10 @@ export class GameWorld {
         }
       }
 
+      if (now < monster.stunnedUntil) {
+        continue;
+      }
+
       let target = monster.targetPlayerId ? this.players.get(monster.targetPlayerId) : undefined;
       if (
         !target ||
@@ -225,8 +233,9 @@ export class GameWorld {
 
       if (target) {
         const dist = this.distance(monster, target);
+        const currentSpeed = now < monster.slowUntil ? monster.speed * 0.5 : monster.speed;
         if (dist > monster.attackRange) {
-          this.moveToward(monster, target.x, target.z, monster.speed * dt);
+          this.moveToward(monster, target.x, target.z, currentSpeed * dt);
         } else if (now - monster.lastAttackAt >= monster.attackCooldownMs) {
           monster.lastAttackAt = now;
           this.monsterAttack(monster, target);
@@ -244,7 +253,8 @@ export class GameWorld {
         };
       }
       if (monster.wanderTarget) {
-        const reached = this.moveToward(monster, monster.wanderTarget.x, monster.wanderTarget.z, monster.speed * 0.35 * dt);
+        const currentSpeed = now < monster.slowUntil ? monster.speed * 0.5 : monster.speed;
+        const reached = this.moveToward(monster, monster.wanderTarget.x, monster.wanderTarget.z, currentSpeed * 0.35 * dt);
         if (reached) monster.wanderTarget = null;
       }
     }
@@ -432,6 +442,7 @@ export class GameWorld {
     const player = this.players.get(socketId);
     if (!player || player.dead || !Number.isFinite(x) || !Number.isFinite(z)) return;
     const now = Date.now();
+    if (now < player.stunnedUntil) return;
     const elapsed = Math.max(0.05, (now - player.lastMoveAt) / 1000);
     const clamped = clampPosition(x, z, WORLD_RADIUS);
     const dx = clamped.x - player.x;
@@ -458,6 +469,7 @@ export class GameWorld {
     const attacker = this.players.get(socketId);
     if (!attacker || attacker.dead) return;
     const now = Date.now();
+    if (now < attacker.stunnedUntil) return this.error(socketId, "Bạn đang bị choáng!");
     if (now - attacker.lastAttackAt < BASIC_COOLDOWN_MS) return;
     attacker.lastAttackAt = now;
     attacker.lastCombatAt = now;
@@ -485,97 +497,178 @@ export class GameWorld {
     this.damagePlayer(attacker, target, damage, false, crit);
   }
 
-  async useSkill(socketId: string, targetId: string | null, targetType: "monster" | "player") {
+  async useSkill(
+    socketId: string,
+    slotInput: "Q" | "W" | "E" | "R" | undefined,
+    targetId: string | null,
+    targetType: "monster" | "player",
+  ) {
+    const slot = slotInput ?? "Q";
     const attacker = this.players.get(socketId);
     if (!attacker || attacker.dead) return;
-    const sect = SECTS[attacker.sect];
-    const skill = sect.skill;
     const now = Date.now();
-    if (now - attacker.lastSkillAt < skill.cooldownMs) return;
+    if (now < attacker.stunnedUntil) return this.error(socketId, "Bạn đang bị choáng!");
+
+    const sect = SECTS[attacker.sect];
+    const skill = sect.skills[slot];
+    if (!skill) return this.error(socketId, "Kỹ năng không hợp lệ.");
+
+    const lastUsed = attacker.skillCooldowns[slot] ?? 0;
+    if (now - lastUsed < skill.cooldownMs) {
+      const remainingSec = ((skill.cooldownMs - (now - lastUsed)) / 1000).toFixed(1);
+      return this.error(socketId, `Kỹ năng ${skill.name} chưa hồi chiêu (${remainingSec}s).`);
+    }
+
     if (attacker.mp < skill.mpCost) return this.error(socketId, "Không đủ nội lực.");
-    if (!targetId && skill.type !== "MELEE") return this.error(socketId, "Cần chọn mục tiêu.");
+
+    // Target checks for targeted skills vs AoE/Buff/Self skills
+    const isSelfOrAoE = skill.type === "BUFF" || skill.type === "HEAL" || skill.range === 0 || (skill.type === "MELEE" && !targetId);
+    if (!targetId && !isSelfOrAoE) {
+      return this.error(socketId, "Cần chọn mục tiêu.");
+    }
+
+    // Process Dash mechanic first
+    if (skill.type === "DASH" && skill.dashDistance) {
+      let dashX = attacker.x;
+      let dashZ = attacker.z;
+
+      if (targetId) {
+        const targetEntity = targetType === "monster" ? this.monsters.get(targetId) : this.players.get(targetId);
+        if (targetEntity && !targetEntity.dead) {
+          const dx = targetEntity.x - attacker.x;
+          const dz = targetEntity.z - attacker.z;
+          const dist = Math.hypot(dx, dz);
+          if (dist > 0.1) {
+            const step = Math.min(dist, skill.dashDistance);
+            dashX = attacker.x + (dx / dist) * step;
+            dashZ = attacker.z + (dz / dist) * step;
+            attacker.rotation = Math.atan2(dx, dz);
+          }
+        }
+      } else {
+        dashX = attacker.x + Math.sin(attacker.rotation) * skill.dashDistance;
+        dashZ = attacker.z + Math.cos(attacker.rotation) * skill.dashDistance;
+      }
+
+      const clamped = clampPosition(dashX, dashZ, WORLD_RADIUS);
+      if (!crossesCityWall(attacker.x, attacker.z, clamped.x, clamped.z)) {
+        attacker.x = clamped.x;
+        attacker.z = clamped.z;
+        this.maybeEnableGatePvp(attacker);
+      }
+    }
 
     const applyToMonster = async (monster: RuntimeMonster) => {
       if (monster.dead) return;
-      const { damage, crit } = rollDamage(attacker.stats.attack, monster.defense, skill.power);
-      await this.damageMonster(attacker, monster, damage, true, skill.power, crit);
+      const effectivePower = skill.power;
+      const { damage, crit } = rollDamage(attacker.stats.attack, monster.defense, effectivePower);
+      await this.damageMonster(attacker, monster, damage, true, effectivePower, crit);
+
       if (skill.type === "POISON" && !monster.dead) {
         monster.poisonUntil = now + 5000;
         monster.poisonTickAt = now + 1000;
-        monster.poisonDamage = Math.round(attacker.stats.attack * 0.22);
+        monster.poisonDamage = Math.round(attacker.stats.attack * 0.22 * skill.power);
         monster.poisonSourceId = socketId;
+      }
+
+      if (skill.type === "RANGED" && skill.id === "emei_w") {
+        monster.slowUntil = now + 3000;
+      }
+
+      if (skill.stunMs && !monster.dead) {
+        monster.stunnedUntil = Math.max(monster.stunnedUntil, now + skill.stunMs);
       }
     };
 
-    if (skill.type === "MELEE") {
-      const targets = [...this.monsters.values()].filter(
-        (monster) => !monster.dead && this.distance(attacker, monster) <= skill.range,
-      );
-      if (targets.length === 0) return this.error(socketId, "Không có mục tiêu trong tầm.");
-      attacker.mp -= skill.mpCost;
-      attacker.lastSkillAt = now;
-      attacker.lastCombatAt = now;
-      for (const monster of targets) await applyToMonster(monster);
-      if (attacker.pvpEnabled) {
-        for (const player of this.players.values()) {
-          if (player.socketId === socketId || player.dead) continue;
-          if (player.faction === attacker.faction) continue;
-          if (this.distance(attacker, player) > skill.range) continue;
-          if (this.inSafeZone(attacker) || this.inSafeZone(player)) continue;
-          const { damage, crit } = rollDamage(attacker.stats.attack, player.stats.defense, skill.power);
-          this.damagePlayer(attacker, player, damage, true, crit);
-        }
-      }
-      this.emitSelf(attacker);
-      return;
-    }
+    const applyToPlayer = (targetPlayer: RuntimePlayer) => {
+      if (targetPlayer.dead) return;
+      const effectiveDefense = now < targetPlayer.buffUntil ? targetPlayer.stats.defense + targetPlayer.buffDefense : targetPlayer.stats.defense;
+      const { damage, crit } = rollDamage(attacker.stats.attack, effectiveDefense, skill.power);
+      this.damagePlayer(attacker, targetPlayer, damage, true, crit);
 
-    if (!targetId) return;
-    if (targetType === "monster") {
-      const monster = this.monsters.get(targetId);
-      if (!monster || monster.dead || this.distance(attacker, monster) > skill.range) {
-        return this.error(socketId, "Mục tiêu không hợp lệ hoặc ngoài tầm.");
+      if (skill.stunMs && !targetPlayer.dead) {
+        targetPlayer.stunnedUntil = Math.max(targetPlayer.stunnedUntil, now + skill.stunMs);
       }
-      attacker.mp -= skill.mpCost;
-      attacker.lastSkillAt = now;
-      attacker.lastCombatAt = now;
-      await applyToMonster(monster);
-      if (skill.type === "HEAL") {
-        attacker.hp = Math.min(attacker.stats.maxHp, attacker.hp + Math.round(attacker.stats.maxHp * 0.18));
-        this.io.emit("combat:event", {
-          attackerId: attacker.socketId,
-          attackerName: attacker.name,
-          targetId: attacker.socketId,
-          targetType: "player",
-          targetName: attacker.name,
-          damage: -Math.round(attacker.stats.maxHp * 0.18),
-          crit: false,
-          skill: true,
-          targetHp: attacker.hp,
-          targetMaxHp: attacker.stats.maxHp,
-          killed: false,
-        });
-      }
-      this.emitSelf(attacker);
-      return;
-    }
+    };
 
-    const target = this.players.get(targetId);
-    if (!target || target.dead || target.socketId === socketId) return this.error(socketId, "Mục tiêu không hợp lệ.");
-    if (!attacker.pvpEnabled) return this.error(socketId, "Bật PvP trước khi tấn công người chơi khác.");
-    if (target.faction === attacker.faction) return this.error(socketId, "Không thể tấn công người cùng phe.");
-    if (this.inSafeZone(attacker) || this.inSafeZone(target)) {
-      return this.error(socketId, "Không thể giao chiến trong khu vực an toàn của thành.");
-    }
-    if (this.distance(attacker, target) > skill.range) return this.error(socketId, "Mục tiêu quá xa.");
+    // Deduct MP and set cooldown
     attacker.mp -= skill.mpCost;
+    attacker.skillCooldowns[slot] = now;
     attacker.lastSkillAt = now;
     attacker.lastCombatAt = now;
-    const { damage, crit } = rollDamage(attacker.stats.attack, target.stats.defense, skill.power);
-    this.damagePlayer(attacker, target, damage, true, crit);
-    if (skill.type === "HEAL") {
-      attacker.hp = Math.min(attacker.stats.maxHp, attacker.hp + Math.round(attacker.stats.maxHp * 0.18));
+
+    // Execute skill effects based on type
+    if (skill.type === "BUFF") {
+      if (skill.id === "shaolin_r") {
+        attacker.hp = Math.min(attacker.stats.maxHp, attacker.hp + Math.round(attacker.stats.maxHp * 0.25));
+        attacker.buffUntil = now + 6000;
+        attacker.buffDefense = Math.round(attacker.stats.defense * 0.5);
+      }
+      this.emitSelf(attacker);
+      return;
     }
+
+    if (skill.type === "HEAL") {
+      if (skill.id === "emei_e") {
+        attacker.stunnedUntil = 0;
+        attacker.hp = Math.min(attacker.stats.maxHp, attacker.hp + Math.round(attacker.stats.maxHp * 0.35));
+      } else {
+        attacker.hp = Math.min(attacker.stats.maxHp, attacker.hp + Math.round(attacker.stats.maxHp * 0.2));
+      }
+      this.io.emit("combat:event", {
+        attackerId: attacker.socketId,
+        attackerName: attacker.name,
+        targetId: attacker.socketId,
+        targetType: "player",
+        targetName: attacker.name,
+        damage: -Math.round(attacker.stats.maxHp * 0.2),
+        crit: false,
+        skill: true,
+        targetHp: attacker.hp,
+        targetMaxHp: attacker.stats.maxHp,
+        killed: false,
+      });
+    }
+
+    // AoE vs Targeted hit
+    const isAoE = skill.type === "MELEE" || (skill.type === "STUN" && skill.range <= 8) || (skill.type === "POISON" && skill.range > 5);
+    if (isAoE) {
+      const monsterTargets = [...this.monsters.values()].filter(
+        (m) => !m.dead && this.distance(attacker, m) <= Math.max(skill.range, 6),
+      );
+      for (const m of monsterTargets) await applyToMonster(m);
+
+      if (attacker.pvpEnabled) {
+        for (const p of this.players.values()) {
+          if (p.socketId === socketId || p.dead || p.faction === attacker.faction) continue;
+          if (this.distance(attacker, p) > Math.max(skill.range, 6)) continue;
+          if (this.inSafeZone(attacker) || this.inSafeZone(p)) continue;
+          applyToPlayer(p);
+        }
+      }
+    } else if (targetId) {
+      if (targetType === "monster") {
+        const monster = this.monsters.get(targetId);
+        if (monster && !monster.dead && this.distance(attacker, monster) <= skill.range + 4) {
+          await applyToMonster(monster);
+        }
+      } else {
+        const target = this.players.get(targetId);
+        if (
+          target &&
+          !target.dead &&
+          target.socketId !== socketId &&
+          attacker.pvpEnabled &&
+          target.faction !== attacker.faction &&
+          !this.inSafeZone(attacker) &&
+          !this.inSafeZone(target) &&
+          this.distance(attacker, target) <= skill.range + 4
+        ) {
+          applyToPlayer(target);
+        }
+      }
+    }
+
     this.emitSelf(attacker);
   }
 
@@ -908,6 +1001,7 @@ export class GameWorld {
         rotation: player.rotation,
         pvpEnabled: player.pvpEnabled,
         dead: player.dead,
+        stunnedUntil: player.stunnedUntil > now ? player.stunnedUntil : undefined,
       });
     }
     const monsters: MonsterSnapshot[] = [];
@@ -925,6 +1019,7 @@ export class GameWorld {
         rotation: monster.rotation,
         isBoss: monster.isBoss,
         dead: monster.dead,
+        stunnedUntil: monster.stunnedUntil > now ? monster.stunnedUntil : undefined,
       });
     }
     return {
