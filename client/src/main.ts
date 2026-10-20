@@ -42,6 +42,17 @@ let activeNpc: NpcInfo | null = null;
 let nearbyNpc: NpcInfo | null = null;
 let promptNpcId: string | null = null;
 let clickTargetPosition: { x: number; z: number } | null = null;
+let lastMouseX = window.innerWidth / 2;
+let lastMouseY = window.innerHeight / 2;
+
+window.addEventListener("mousemove", (event) => {
+  lastMouseX = event.clientX;
+  lastMouseY = event.clientY;
+});
+
+function isMobileDevice(): boolean {
+  return "ontouchstart" in window || navigator.maxTouchPoints > 0 || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
 
 const keys = new Set<string>();
 let selectedSect: SectId = "SHAOLIN";
@@ -882,11 +893,10 @@ function performSkill(slot: "Q" | "W" | "E" | "R") {
   const skill = content.sects[self.sect].skills[slot];
   if (!skill) return;
 
-  const isSelfOrAoE = skill.type === "BUFF" || skill.type === "HEAL" || skill.range === 0 || (skill.type === "MELEE" && !target);
-  if (!target && !isSelfOrAoE) {
-    notify("Hãy chọn mục tiêu cho kỹ năng.", "info");
-    return;
-  }
+  target = null;
+  updateTargetFrame();
+  game?.setTarget(null, null);
+
   if (self.mp < skill.mpCost) {
     notify("Không đủ nội lực.", "danger");
     return;
@@ -894,8 +904,23 @@ function performSkill(slot: "Q" | "W" | "E" | "R") {
   const now = performance.now();
   const readyAt = skillCooldownsAt[slot] ?? 0;
   if (now < readyAt) return;
+
+  if (game && !isMobileDevice()) {
+    const groundPoint = game.getGroundPointFromPointer(lastMouseX, lastMouseY);
+    const selfPos = game.getLocalPosition();
+    if (groundPoint && selfPos) {
+      const dx = groundPoint.x - selfPos.x;
+      const dz = groundPoint.z - selfPos.z;
+      if (Math.hypot(dx, dz) > 0.1) {
+        const aimRotation = Math.atan2(dx, dz);
+        game.setLocalRotation(aimRotation);
+        net.emit("player:move", { x: selfPos.x, z: selfPos.z, rotation: aimRotation });
+      }
+    }
+  }
+
   skillCooldownsAt[slot] = now + skill.cooldownMs;
-  net.emit("combat:skill", { slot, targetId: target?.id ?? null, targetType: target?.kind ?? "monster" });
+  net.emit("combat:skill", { slot, targetId: null, targetType: "monster" });
 }
 
 function useHpPotion() {
