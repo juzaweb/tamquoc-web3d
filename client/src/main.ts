@@ -180,13 +180,8 @@ function showAuthError(message: string) {
   $("auth-error").textContent = message;
 }
 
-function notify(message: string, kind: "success" | "danger" | "info" = "info") {
-  const container = $("notifications");
-  const node = document.createElement("div");
-  node.className = `notification ${kind}`;
-  node.textContent = message;
-  container.appendChild(node);
-  setTimeout(() => node.remove(), 3800);
+function notify(message: string, _kind: "success" | "danger" | "info" = "info") {
+  appendSystemChat(message);
 }
 
 function appendChat(message: {
@@ -200,15 +195,18 @@ function appendChat(message: {
   const log = $("chat-log");
   const line = document.createElement("div");
   line.className = `chat-line ${message.channel}${message.system ? " system" : ""}`;
+  const tag = document.createElement("span");
+  tag.className = "chat-channel-tag";
   if (!message.system) {
-    const tag = document.createElement("span");
-    tag.className = "chat-channel-tag";
     tag.textContent = message.channel === "faction" ? "[Phe]" : "[TG]";
     line.appendChild(tag);
     const from = document.createElement("span");
     from.className = "chat-from";
     from.textContent = `${message.from}: `;
     line.appendChild(from);
+  } else {
+    tag.textContent = "[TB]";
+    line.appendChild(tag);
   }
   const text = document.createElement("span");
   text.textContent = message.message;
@@ -506,14 +504,12 @@ const reconnect = new ReconnectController({
     banner.classList.toggle("hidden", !message);
     if (message) banner.textContent = message;
   },
-  onNotice: (message) => notify(message, "danger"),
   onSystemChat: appendSystemChat,
   onRestored: () => {
-    notify("Đã kết nối lại.", "success");
     appendSystemChat("Đã kết nối lại với server.");
   },
   onGiveUp: (message, sessionExpired) => {
-    notify(message, "danger");
+    appendSystemChat(message);
     if (sessionExpired) {
       token = null;
       localStorage.removeItem("tq_token");

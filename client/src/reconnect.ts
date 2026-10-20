@@ -5,7 +5,6 @@ export interface ReconnectOptions {
   disconnect: () => void;
   enterWorld: (characterId: string) => void;
   onBanner: (message: string | null) => void;
-  onNotice: (message: string) => void;
   onSystemChat: (message: string) => void;
   onRestored: () => void;
   onGiveUp: (message: string, sessionExpired: boolean) => void;
@@ -29,7 +28,6 @@ export class ReconnectController {
     this.running = true;
     this.attempts = 0;
     this.options.onBanner("Đang kết nối lại...");
-    this.options.onNotice("Mất kết nối tới server. Đang thử kết nối lại...");
     this.options.onSystemChat("Mất kết nối tới server. Đang thử kết nối lại...");
     void this.attempt();
   }
